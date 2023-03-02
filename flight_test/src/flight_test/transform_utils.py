@@ -1,6 +1,8 @@
 import math
 import numpy as np
 from geometry_msgs.msg import Pose
+import rospy
+import tf2_ros
 
 def euler_from_quaternion(q):
     """
@@ -74,4 +76,25 @@ def matrix_to_pose(T):
         pose.orientation.y = (T[2, 1] + T[1, 2]) / s
         pose.orientation.z = 0.25 * s
     
+    return pose
+
+def get_transform(tf_buffer, target_frame, source_frame,
+                  stamp=None, timeout=0.1):
+    try:
+        stamp = stamp if stamp is not None else rospy.Time(0)
+        return tf_buffer.lookup_transform(
+            target_frame, source_frame, stamp, rospy.Duration(timeout))
+    except (tf2_ros.LookupException,
+            tf2_ros.ConnectivityException,
+            tf2_ros.ExtrapolationException) as e:
+        rospy.logwarn_throttle(2.0,
+            f"TF lookup failed ({target_frame} -> {source_frame}): {e}")
+        return None
+
+def transform_to_pose(trans):
+    pose = Pose()
+    pose.position.x = trans.transform.translation.x
+    pose.position.y = trans.transform.translation.y
+    pose.position.z = trans.transform.translation.z
+    pose.orientation = trans.transform.rotation
     return pose

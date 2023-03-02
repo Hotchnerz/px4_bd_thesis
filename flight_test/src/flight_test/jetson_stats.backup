@@ -1,0 +1,281 @@
+#!/usr/bin/env python3
+import rospy
+import psutil
+import subprocess
+import re
+from diagnostic_msgs.msg import DiagnosticArray, DiagnosticStatus, KeyValue
+from mavros_msgs.msg import TimesyncStatus
+
+# Jetson Nano sysfs paths
+GPU_LOAD_PATH = '/sys/devices/gpu.0/load'
+THERMAL_ZONES = '/sys/devices/virtual/thermal/thermal_zone{}/temp'
+
+# Timesync thresholds (milliseconds)
+CHRONY_WARN_MS = 10.0
+CHRONY_ERROR_MS = 50.0
+MAVROS_WARN_MS = 20.0
+MAVROS_ERROR_MS = 100.0
+
+
+def read_sysfs(path):
+    #Read a sysfs file and return its contents, or None
+    try:
+        with open(path, 'r') as f:
+            return f.read().strip()
+    except (IOError, OSError):
+        return None
+
+
+def find_thermal_zones():
+    #Find which are the thermal zones that correspond to CPU and GPU."""
+    cpu_zone = None
+    gpu_zone = None
+    for i in range(8):
+        type_path = '/sys/devices/virtual/thermal/thermal_zone{}/type'.format(i)
+        zone_type = read_sysfs(type_path)
+        if zone_type is None:
+            continue
+        zone_type = zone_type.lower()
+        if 'cpu' in zone_type or zone_type == 'cpu-therm':
+            cpu_zone = i
+        elif 'gpu' in zone_type or zone_type == 'gpu-therm':
+            gpu_zone = i
+    return cpu_zone, gpu_zone
+
+
+def get_gpu_percent():
+    #Read GPU load from sysfs. Returns percentage or returns -1 if something is wrong with retrieving
+    raw = read_sysfs(GPU_LOAD_PATH)
+    if raw is not None:
+        try:
+            return float(raw) / 10.0  # 0-1000 -> 0-100%
+        except ValueError:
+            pass
+    return -1.0
+
+
+def get_temp(zone_id):
+    #Read thermal zone temp in Celsius.
+    if zone_id is None:
+        return -1.0
+    raw = read_sysfs(THERMAL_ZONES.format(zone_id))
+    if raw is not None:
+        try:
+            return float(raw) / 1000.0  # millidegrees -> degrees C
+        except ValueError:
+            pass
+    return -1.0
+
+
+def get_chrony_status():
+    #Query chrony and return a DiagnosticStatus for Jetson<->Laptop sync
+    status = DiagnosticStatus()
+    status.name = 'Timesync: Chrony (Jetson-Laptop)'
+    status.hardware_id = 'jetson_chrony'
+
+    try:
+        tracking = subprocess.check_output(
+            ['chronyc', '-n', 'tracking'],
+            timeout=2,
+            stderr=subprocess.STDOUT
+        ).decode('utf-8')
+
+        # Parse fields from chronyc tracking output
+        offset_match = re.search(r'Last offset\s*:\s*([+-]?\d+\.?\d*e?[+-]?\d*)', tracking)
+        leap_match = re.search(r'Leap status\s*:\s*(.+)', tracking)
+        stratum_match = re.search(r'Stratum\s*:\s*(\d+)', tracking)
+        ref_match = re.search(r'Reference ID\s*:\s*\S+\s*\((.+?)\)', tracking)
+        freq_match = re.search(r'Frequency\s*:\s*([+-]?\d+\.?\d*)\s*ppm', tracking)
+
+        if offset_match:
+            offset_s = float(offset_match.group(1))
+            offset_ms = abs(offset_s) * 1000.0
+
+            status.values.append(KeyValue(key='Offset ms', value='{:.3f}'.format(offset_s * 1000)))
+            status.values.append(KeyValue(key='Abs Offset ms', value='{:.3f}'.format(offset_ms)))
+
+            if offset_ms < CHRONY_WARN_MS:
+                status.level = DiagnosticStatus.OK
+                status.message = 'Synced ({:.1f}ms)'.format(offset_ms)
+            elif offset_ms < CHRONY_ERROR_MS:
+                status.level = DiagnosticStatus.WARN
+                status.message = 'Drift: {:.1f}ms'.format(offset_ms)
+            else:
+                status.level = DiagnosticStatus.ERROR
+                status.message = 'LARGE OFFSET: {:.1f}ms - clock not synced'.format(offset_ms)
+        else:
+            status.level = DiagnosticStatus.WARN
+            status.message = 'Could not parse chrony offset'
+
+        if leap_match:
+            leap = leap_match.group(1).strip()
+            status.values.append(KeyValue(key='Leap Status', value=leap))
+            if leap != 'Normal':
+                status.level = DiagnosticStatus.ERROR
+                status.message = 'Leap status: {}'.format(leap)
+
+        if stratum_match:
+            status.values.append(KeyValue(key='Stratum', value=stratum_match.group(1)))
+
+        if ref_match:
+            status.values.append(KeyValue(key='Reference', value=ref_match.group(1)))
+
+        if freq_match:
+            status.values.append(KeyValue(key='Freq Offset ppm', value=freq_match.group(1)))
+
+    except subprocess.TimeoutExpired:
+        status.level = DiagnosticStatus.ERROR
+        status.message = 'chronyc timed out'
+    except FileNotFoundError:
+        status.level = DiagnosticStatus.ERROR
+        status.message = 'chrony not installed'
+    except Exception as e:
+        status.level = DiagnosticStatus.ERROR
+        status.message = 'chrony error: {}'.format(str(e))
+
+    return status
+
+
+class MavrosTimesyncMonitor:
+    #Tracks MAVROS timesync status from the /mavros/timesync_status topic
+
+    def __init__(self):
+        self.estimated_offset_ns = None
+        self.observed_offset_ns = None
+        self.rtt_ms = None
+        self.last_recv_time = None
+
+        rospy.Subscriber(
+            '/mavros/timesync_status',
+            TimesyncStatus,
+            self._cb
+        )
+
+    def _cb(self, msg):
+        self.estimated_offset_ns = msg.estimated_offset_ns
+        self.observed_offset_ns = msg.observed_offset_ns
+        self.rtt_ms = msg.round_trip_time_ms
+        self.last_recv_time = rospy.Time.now()
+
+    def get_status(self):
+        #Return a DiagnosticStatus for MAVROS<->PX4 timesync.
+        status = DiagnosticStatus()
+        status.name = 'Timesync: MAVROS (Jetson-PX4)'
+        status.hardware_id = 'mavros_timesync'
+
+        if self.last_recv_time is None:
+            status.level = DiagnosticStatus.STALE
+            status.message = 'No timesync messages received'
+            return status
+
+        age = (rospy.Time.now() - self.last_recv_time).to_sec()
+        if age > 5.0:
+            status.level = DiagnosticStatus.STALE
+            status.message = 'No update for {:.1f}s'.format(age)
+            status.values.append(KeyValue(key='Age s', value='{:.1f}'.format(age)))
+            return status
+
+        # Compute filter error (how far estimated is from observed)
+        error_ms = abs(self.estimated_offset_ns - self.observed_offset_ns) / 1e6
+
+        status.values.append(
+            KeyValue(key='Estimated Offset ms',
+                     value='{:.3f}'.format(self.estimated_offset_ns / 1e6)))
+        status.values.append(
+            KeyValue(key='Observed Offset ms',
+                     value='{:.3f}'.format(self.observed_offset_ns / 1e6)))
+        status.values.append(
+            KeyValue(key='Filter Error ms',
+                     value='{:.3f}'.format(error_ms)))
+        status.values.append(
+            KeyValue(key='RTT ms',
+                     value='{:.1f}'.format(self.rtt_ms)))
+
+        if error_ms < MAVROS_WARN_MS:
+            status.level = DiagnosticStatus.OK
+            status.message = 'Converged (err: {:.1f}ms, RTT: {:.0f}ms)'.format(
+                error_ms, self.rtt_ms)
+        elif error_ms < MAVROS_ERROR_MS:
+            status.level = DiagnosticStatus.WARN
+            status.message = 'Converging: {:.1f}ms error'.format(error_ms)
+        else:
+            status.level = DiagnosticStatus.ERROR
+            status.message = 'NOT CONVERGED: {:.0f}ms error - DO NOT ARM'.format(error_ms)
+
+        return status
+
+
+def main():
+    rospy.init_node('system_monitor', anonymous=False)
+    pub = rospy.Publisher('/diagnostics', DiagnosticArray, queue_size=1)
+    rate = rospy.Rate(rospy.get_param('~rate', 1))
+
+    cpu_zone, gpu_zone = find_thermal_zones()
+    if cpu_zone is not None:
+        rospy.loginfo('CPU thermal zone: thermal_zone%d', cpu_zone)
+    else:
+        rospy.logwarn('Could not identify CPU thermal zone')
+    if gpu_zone is not None:
+        rospy.loginfo('GPU thermal zone: thermal_zone%d', gpu_zone)
+    else:
+        rospy.logwarn('Could not identify GPU thermal zone')
+
+    # Initialize MAVROS timesync monitor
+    mavros_timesync = MavrosTimesyncMonitor()
+    rospy.loginfo('MAVROS timesync monitor started')
+
+    # Prime the first cpu_percent call (first call always returns 0)
+    psutil.cpu_percent(interval=None)
+
+    while not rospy.is_shutdown():
+        cpu_pct = psutil.cpu_percent(interval=None)
+        ram_pct = psutil.virtual_memory().percent
+        gpu_pct = get_gpu_percent()
+        cpu_temp = get_temp(cpu_zone)
+        gpu_temp = get_temp(gpu_zone)
+
+        # ---- System monitor status ----
+        level = DiagnosticStatus.OK
+        message = 'OK'
+        if cpu_temp > 80 or gpu_temp > 80:
+            level = DiagnosticStatus.ERROR
+            message = 'THERMAL CRITICAL'
+        elif cpu_temp > 65 or gpu_temp > 65:
+            level = DiagnosticStatus.WARN
+            message = 'THERMAL WARNING'
+        elif cpu_pct > 90 or ram_pct > 90:
+            level = DiagnosticStatus.WARN
+            message = 'HIGH LOAD'
+
+        system_status = DiagnosticStatus()
+        system_status.level = level
+        system_status.name = 'Jetson System Monitor'
+        system_status.message = message
+        system_status.hardware_id = 'jetson_nano'
+        system_status.values = [
+            KeyValue(key='CPU %', value='{:.1f}'.format(cpu_pct)),
+            KeyValue(key='RAM %', value='{:.1f}'.format(ram_pct)),
+            KeyValue(key='GPU %', value='{:.1f}'.format(gpu_pct)),
+            KeyValue(key='CPU Temp C', value='{:.1f}'.format(cpu_temp)),
+            KeyValue(key='GPU Temp C', value='{:.1f}'.format(gpu_temp)),
+        ]
+
+        # Timesync statuses 
+        chrony_status = get_chrony_status()
+        mavros_status = mavros_timesync.get_status()
+
+        # Publish all diagnostics
+        msg = DiagnosticArray()
+        msg.header.stamp = rospy.Time.now()
+        msg.status = [system_status, chrony_status, mavros_status]
+        pub.publish(msg)
+
+        rate.sleep()
+
+
+if __name__ == '__main__':
+    try:
+        main()
+    except rospy.ROSInterruptException:
+        pass
+

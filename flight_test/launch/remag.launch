@@ -1,0 +1,9 @@
+<launch>
+  	<node name="serial_node"        pkg="rosserial_python"      type="serial_node.py">
+  	<param name="port"              type="string"               value="/dev/ttyACM0"/>
+  	<param name="baud"              type="int"                  value="115200"/>
+        </node>
+
+	<node name="epm_state_reset_pub" pkg="rostopic" type="rostopic"
+		args="pub -1 /fg40_cmd fg40_msgs/FG40MagnetCmd 'cmd_magnet: 2'" />
+</launch>

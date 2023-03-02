@@ -29,8 +29,11 @@
    <!-- node pkg="tf2_ros" type="static_transform_publisher" name="rpicam_to_baselink"
 	 args ="0.09275 0.0 -0.05612 0.707 0.707 0.0 0.0 base_link csi_cam_0_link" /> -->
 
+   <!-- node pkg="tf2_ros" type="static_transform_publisher" name="c920_to_baselink"
+	args ="0.09275 0.0 -0.05612  -0.707 0.707 0.0 0.0 base_link c920_link" /> -->
+
    <node pkg="tf2_ros" type="static_transform_publisher" name="c920_to_baselink"
-	args ="0.09275 0.0 -0.05612  -0.707 0.707 0.0 0.0 base_link c920_link" />
+	args ="0.0665 0.0 -0.055  -0.707 0.707 0.0 0.0 base_link c920_link" />
 
 </launch>
 
