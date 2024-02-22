@@ -1,0 +1,78 @@
+[0.000000] (-) TimerEvent: {}
+[0.000138] (-) JobUnselected: {'identifier': 'px4_msgs'}
+[0.000317] (-) JobUnselected: {'identifier': 'px4_ros_com'}
+[0.000366] (flight_test) JobQueued: {'identifier': 'flight_test', 'dependencies': OrderedDict()}
+[0.000414] (flight_test) JobStarted: {'identifier': 'flight_test'}
+[0.099524] (-) TimerEvent: {}
+[0.199919] (-) TimerEvent: {}
+[0.300290] (-) TimerEvent: {}
+[0.392135] (flight_test) Command: {'cmd': ['/usr/bin/python3', 'setup.py', 'egg_info', '--egg-base', '../build/flight_test', 'build', '--build-base', '/home/radam/px4_ros_com_ros2/src/build/flight_test/build', 'install', '--record', '/home/radam/px4_ros_com_ros2/src/build/flight_test/install.log', '--install-scripts', '$base/lib/flight_test', '--single-version-externally-managed'], 'cwd': '/home/radam/px4_ros_com_ros2/src/flight_test', 'env': {'LESSOPEN': '| /usr/bin/lesspipe %s', 'LANGUAGE': 'en_CA:en', 'USER': 'radam', 'SSH_AGENT_PID': '2389', 'XDG_SESSION_TYPE': 'x11', 'SHLVL': '1', 'LD_LIBRARY_PATH': '/home/radam/px4_ros_com_ros2/install/px4_ros_com/lib:/home/radam/px4_ros_com_ros2/install/px4_msgs/lib:/opt/ros/foxy/opt/yaml_cpp_vendor/lib:/opt/ros/foxy/opt/rviz_ogre_vendor/lib:/opt/ros/foxy/lib/x86_64-linux-gnu:/opt/ros/foxy/lib', 'HOME': '/home/radam', 'OLDPWD': '/home/radam/px4_ros_com_ros2', 'DESKTOP_SESSION': 'ubuntu', 'ROS_PYTHON_VERSION': '3', 'GNOME_SHELL_SESSION_MODE': 'ubuntu', 'GTK_MODULES': 'gail:atk-bridge', 'PS1': '(px4_focal_testbench) \\[\\e]0;\\u@\\h: \\w\\a\\]${debian_chroot:+($debian_chroot)}\\[\\033[01;32m\\]\\u@\\h\\[\\033[00m\\]:\\[\\033[01;34m\\]\\w\\[\\033[00m\\]\\$', 'MANAGERPID': '2134', 'DBUS_SESSION_BUS_ADDRESS': 'unix:path=/run/user/1000/bus', 'COLORTERM': 'truecolor', 'IM_CONFIG_PHASE': '1', 'COLCON_PREFIX_PATH': '/home/radam/px4_ros_com_ros2/install', 'ROS_DISTRO': 'foxy', 'LOGNAME': 'radam', 'JOURNAL_STREAM': '8:60600', '_': '/usr/bin/colcon', 'ROS_VERSION': '2', 'XDG_SESSION_CLASS': 'user', 'USERNAME': 'radam', 'TERM': 'xterm-256color', 'GNOME_DESKTOP_SESSION_ID': 'this-is-deprecated', 'ROS_LOCALHOST_ONLY': '0', 'WINDOWPATH': '2', 'PATH': '/home/radam/px4_focal_testbench/bin:/home/radam/px4_ros_com_ros2/install/px4_ros_com/bin:/opt/ros/foxy/bin:/opt/gcc-arm-none-eabi-9-2020-q2-update/bin:/home/radam/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin', 'SESSION_MANAGER': 'local/radam-P1G5-Focal:@/tmp/.ICE-unix/2426,unix/radam-P1G5-Focal:/tmp/.ICE-unix/2426', 'INVOCATION_ID': 'b405cbb82e664380a46d85d0b3d2bd03', 'XDG_MENU_PREFIX': 'gnome-', 'GNOME_TERMINAL_SCREEN': '/org/gnome/Terminal/screen/8404f1ef_83fe_474a_b61f_0d2c714994df', 'XDG_RUNTIME_DIR': '/run/user/1000', 'DISPLAY': ':1', 'LANG': 'en_CA.UTF-8', 'XDG_CURRENT_DESKTOP': 'ubuntu:GNOME', 'VIRTUAL_ENV_PROMPT': 'px4_focal_testbench', 'XMODIFIERS': '@im=ibus', 'XDG_SESSION_DESKTOP': 'ubuntu', 'XAUTHORITY': '/run/user/1000/gdm/Xauthority', 'LS_COLORS': 'rs=0:di=01;34:ln=01;36:mh=00:pi=40;33:so=01;35:do=01;35:bd=40;33;01:cd=40;33;01:or=40;31;01:mi=00:su=37;41:sg=30;43:ca=30;41:tw=30;42:ow=34;42:st=37;44:ex=01;32:*.tar=01;31:*.tgz=01;31:*.arc=01;31:*.arj=01;31:*.taz=01;31:*.lha=01;31:*.lz4=01;31:*.lzh=01;31:*.lzma=01;31:*.tlz=01;31:*.txz=01;31:*.tzo=01;31:*.t7z=01;31:*.zip=01;31:*.z=01;31:*.dz=01;31:*.gz=01;31:*.lrz=01;31:*.lz=01;31:*.lzo=01;31:*.xz=01;31:*.zst=01;31:*.tzst=01;31:*.bz2=01;31:*.bz=01;31:*.tbz=01;31:*.tbz2=01;31:*.tz=01;31:*.deb=01;31:*.rpm=01;31:*.jar=01;31:*.war=01;31:*.ear=01;31:*.sar=01;31:*.rar=01;31:*.alz=01;31:*.ace=01;31:*.zoo=01;31:*.cpio=01;31:*.7z=01;31:*.rz=01;31:*.cab=01;31:*.wim=01;31:*.swm=01;31:*.dwm=01;31:*.esd=01;31:*.jpg=01;35:*.jpeg=01;35:*.mjpg=01;35:*.mjpeg=01;35:*.gif=01;35:*.bmp=01;35:*.pbm=01;35:*.pgm=01;35:*.ppm=01;35:*.tga=01;35:*.xbm=01;35:*.xpm=01;35:*.tif=01;35:*.tiff=01;35:*.png=01;35:*.svg=01;35:*.svgz=01;35:*.mng=01;35:*.pcx=01;35:*.mov=01;35:*.mpg=01;35:*.mpeg=01;35:*.m2v=01;35:*.mkv=01;35:*.webm=01;35:*.ogm=01;35:*.mp4=01;35:*.m4v=01;35:*.mp4v=01;35:*.vob=01;35:*.qt=01;35:*.nuv=01;35:*.wmv=01;35:*.asf=01;35:*.rm=01;35:*.rmvb=01;35:*.flc=01;35:*.avi=01;35:*.fli=01;35:*.flv=01;35:*.gl=01;35:*.dl=01;35:*.xcf=01;35:*.xwd=01;35:*.yuv=01;35:*.cgm=01;35:*.emf=01;35:*.ogv=01;35:*.ogx=01;35:*.aac=00;36:*.au=00;36:*.flac=00;36:*.m4a=00;36:*.mid=00;36:*.midi=00;36:*.mka=00;36:*.mp3=00;36:*.mpc=00;36:*.ogg=00;36:*.ra=00;36:*.wav=00;36:*.oga=00;36:*.opus=00;36:*.spx=00;36:*.xspf=00;36:', 'GNOME_TERMINAL_SERVICE': ':1.137', 'SSH_AUTH_SOCK': '/run/user/1000/keyring/ssh', 'AMENT_PREFIX_PATH': '/home/radam/px4_ros_com_ros2/install/px4_ros_com:/home/radam/px4_ros_com_ros2/install/px4_msgs:/home/radam/px4_ros_com_ros2/install/flight_test:/opt/ros/foxy', 'SHELL': '/bin/bash', 'QT_ACCESSIBILITY': '1', 'GDMSESSION': 'ubuntu', 'LESSCLOSE': '/usr/bin/lesspipe %s %s', 'GPG_AGENT_INFO': '/run/user/1000/gnupg/S.gpg-agent:0:1', 'VIRTUAL_ENV': '/home/radam/px4_focal_testbench', 'QT_IM_MODULE': 'ibus', 'PWD': '/home/radam/px4_ros_com_ros2/src/build/flight_test', 'XDG_CONFIG_DIRS': '/etc/xdg/xdg-ubuntu:/etc/xdg', 'XDG_DATA_DIRS': '/usr/share/ubuntu:/usr/local/share/:/usr/share/:/var/lib/snapd/desktop', 'PYTHONPATH': '/home/radam/px4_ros_com_ros2/src/build/flight_test/prefix_override:/home/radam/px4_ros_com_ros2/src/install/flight_test/lib/python3.8/site-packages:/home/radam/px4_ros_com_ros2/install/px4_msgs/lib/python3.8/site-packages:/home/radam/px4_ros_com_ros2/install/flight_test/lib/python3.8/site-packages:/opt/ros/foxy/lib/python3.8/site-packages', 'COLCON': '1', 'VTE_VERSION': '6003', 'CMAKE_PREFIX_PATH': '/home/radam/px4_ros_com_ros2/install/px4_ros_com:/home/radam/px4_ros_com_ros2/install/px4_msgs'}, 'shell': False}
+[0.400404] (-) TimerEvent: {}
+[0.460240] (flight_test) StderrLine: {'line': b'/usr/local/lib/python3.8/dist-packages/setuptools/dist.py:472: SetuptoolsDeprecationWarning: Invalid dash-separated options\n'}
+[0.460381] (flight_test) StderrLine: {'line': b'!!\n'}
+[0.460417] (flight_test) StderrLine: {'line': b'\n'}
+[0.460447] (flight_test) StderrLine: {'line': b'        ********************************************************************************\n'}
+[0.460475] (flight_test) StderrLine: {'line': b"        Usage of dash-separated 'script-dir' will not be supported in future\n"}
+[0.460503] (flight_test) StderrLine: {'line': b"        versions. Please use the underscore name 'script_dir' instead.\n"}
+[0.460532] (flight_test) StderrLine: {'line': b'\n'}
+[0.460558] (flight_test) StderrLine: {'line': b'        By 2024-Sep-26, you need to update your project and remove deprecated calls\n'}
+[0.460631] (flight_test) StderrLine: {'line': b'        or your builds will no longer be supported.\n'}
+[0.460666] (flight_test) StderrLine: {'line': b'\n'}
+[0.460694] (flight_test) StderrLine: {'line': b'        See https://setuptools.pypa.io/en/latest/userguide/declarative_config.html for details.\n'}
+[0.460725] (flight_test) StderrLine: {'line': b'        ********************************************************************************\n'}
+[0.460751] (flight_test) StderrLine: {'line': b'\n'}
+[0.460776] (flight_test) StderrLine: {'line': b'!!\n'}
+[0.460802] (flight_test) StderrLine: {'line': b'  opt = self.warn_dash_deprecation(opt, section)\n'}
+[0.498087] (flight_test) StdoutLine: {'line': b'running egg_info\n'}
+[0.498313] (flight_test) StdoutLine: {'line': b'creating ../build/flight_test/flight_test.egg-info\n'}
+[0.500497] (-) TimerEvent: {}
+[0.503946] (flight_test) StdoutLine: {'line': b'writing ../build/flight_test/flight_test.egg-info/PKG-INFO\n'}
+[0.504169] (flight_test) StdoutLine: {'line': b'writing dependency_links to ../build/flight_test/flight_test.egg-info/dependency_links.txt\n'}
+[0.504236] (flight_test) StdoutLine: {'line': b'writing entry points to ../build/flight_test/flight_test.egg-info/entry_points.txt\n'}
+[0.504268] (flight_test) StdoutLine: {'line': b'writing requirements to ../build/flight_test/flight_test.egg-info/requires.txt\n'}
+[0.504295] (flight_test) StdoutLine: {'line': b'writing top-level names to ../build/flight_test/flight_test.egg-info/top_level.txt\n'}
+[0.542180] (flight_test) StdoutLine: {'line': b"writing manifest file '../build/flight_test/flight_test.egg-info/SOURCES.txt'\n"}
+[0.554239] (flight_test) StdoutLine: {'line': b"reading manifest file '../build/flight_test/flight_test.egg-info/SOURCES.txt'\n"}
+[0.554600] (flight_test) StdoutLine: {'line': b"writing manifest file '../build/flight_test/flight_test.egg-info/SOURCES.txt'\n"}
+[0.554677] (flight_test) StdoutLine: {'line': b'running build\n'}
+[0.554712] (flight_test) StdoutLine: {'line': b'running build_py\n'}
+[0.554915] (flight_test) StdoutLine: {'line': b'creating /home/radam/px4_ros_com_ros2/src/build/flight_test/build\n'}
+[0.554987] (flight_test) StdoutLine: {'line': b'creating /home/radam/px4_ros_com_ros2/src/build/flight_test/build/lib\n'}
+[0.555022] (flight_test) StdoutLine: {'line': b'creating /home/radam/px4_ros_com_ros2/src/build/flight_test/build/lib/flight_test\n'}
+[0.555058] (flight_test) StdoutLine: {'line': b'copying flight_test/offboard_test.py -> /home/radam/px4_ros_com_ros2/src/build/flight_test/build/lib/flight_test\n'}
+[0.555277] (flight_test) StdoutLine: {'line': b'copying flight_test/__init__.py -> /home/radam/px4_ros_com_ros2/src/build/flight_test/build/lib/flight_test\n'}
+[0.555345] (flight_test) StdoutLine: {'line': b'running install\n'}
+[0.555377] (flight_test) StderrLine: {'line': b'/usr/local/lib/python3.8/dist-packages/setuptools/_distutils/cmd.py:66: SetuptoolsDeprecationWarning: setup.py install is deprecated.\n'}
+[0.555410] (flight_test) StderrLine: {'line': b'!!\n'}
+[0.555436] (flight_test) StderrLine: {'line': b'\n'}
+[0.555462] (flight_test) StderrLine: {'line': b'        ********************************************************************************\n'}
+[0.555488] (flight_test) StderrLine: {'line': b'        Please avoid running ``setup.py`` directly.\n'}
+[0.555513] (flight_test) StderrLine: {'line': b'        Instead, use pypa/build, pypa/installer or other\n'}
+[0.555538] (flight_test) StderrLine: {'line': b'        standards-based tools.\n'}
+[0.555562] (flight_test) StderrLine: {'line': b'\n'}
+[0.555588] (flight_test) StderrLine: {'line': b'        See https://blog.ganssle.io/articles/2021/10/setup-py-deprecated.html for details.\n'}
+[0.555613] (flight_test) StderrLine: {'line': b'        ********************************************************************************\n'}
+[0.555638] (flight_test) StderrLine: {'line': b'\n'}
+[0.555661] (flight_test) StderrLine: {'line': b'!!\n'}
+[0.555684] (flight_test) StderrLine: {'line': b'  self.initialize_options()\n'}
+[0.558301] (flight_test) StdoutLine: {'line': b'running install_lib\n'}
+[0.564283] (flight_test) StdoutLine: {'line': b'creating /home/radam/px4_ros_com_ros2/src/install/flight_test/lib/python3.8/site-packages/flight_test\n'}
+[0.564397] (flight_test) StdoutLine: {'line': b'copying /home/radam/px4_ros_com_ros2/src/build/flight_test/build/lib/flight_test/offboard_test.py -> /home/radam/px4_ros_com_ros2/src/install/flight_test/lib/python3.8/site-packages/flight_test\n'}
+[0.564443] (flight_test) StdoutLine: {'line': b'copying /home/radam/px4_ros_com_ros2/src/build/flight_test/build/lib/flight_test/__init__.py -> /home/radam/px4_ros_com_ros2/src/install/flight_test/lib/python3.8/site-packages/flight_test\n'}
+[0.564499] (flight_test) StdoutLine: {'line': b'byte-compiling /home/radam/px4_ros_com_ros2/src/install/flight_test/lib/python3.8/site-packages/flight_test/offboard_test.py to offboard_test.cpython-38.pyc\n'}
+[0.564995] (flight_test) StdoutLine: {'line': b'byte-compiling /home/radam/px4_ros_com_ros2/src/install/flight_test/lib/python3.8/site-packages/flight_test/__init__.py to __init__.cpython-38.pyc\n'}
+[0.565065] (flight_test) StdoutLine: {'line': b'running install_data\n'}
+[0.570927] (flight_test) StdoutLine: {'line': b'creating /home/radam/px4_ros_com_ros2/src/install/flight_test/share/ament_index\n'}
+[0.571019] (flight_test) StdoutLine: {'line': b'creating /home/radam/px4_ros_com_ros2/src/install/flight_test/share/ament_index/resource_index\n'}
+[0.571051] (flight_test) StdoutLine: {'line': b'creating /home/radam/px4_ros_com_ros2/src/install/flight_test/share/ament_index/resource_index/packages\n'}
+[0.571078] (flight_test) StdoutLine: {'line': b'copying resource/flight_test -> /home/radam/px4_ros_com_ros2/src/install/flight_test/share/ament_index/resource_index/packages\n'}
+[0.571111] (flight_test) StdoutLine: {'line': b'copying package.xml -> /home/radam/px4_ros_com_ros2/src/install/flight_test/share/flight_test\n'}
+[0.571137] (flight_test) StdoutLine: {'line': b'running install_egg_info\n'}
+[0.577033] (flight_test) StdoutLine: {'line': b'Copying ../build/flight_test/flight_test.egg-info to /home/radam/px4_ros_com_ros2/src/install/flight_test/lib/python3.8/site-packages/flight_test-0.0.0-py3.8.egg-info\n'}
+[0.577277] (flight_test) StdoutLine: {'line': b'running install_scripts\n'}
+[0.597792] (flight_test) StdoutLine: {'line': b'Installing offboard script to /home/radam/px4_ros_com_ros2/src/install/flight_test/lib/flight_test\n'}
+[0.598030] (flight_test) StdoutLine: {'line': b"writing list of installed files to '/home/radam/px4_ros_com_ros2/src/build/flight_test/install.log'\n"}
+[0.600715] (-) TimerEvent: {}
+[0.611427] (flight_test) CommandEnded: {'returncode': 0}
+[0.628264] (flight_test) JobEnded: {'identifier': 'flight_test', 'rc': 0}
+[0.628610] (-) EventReactorShutdown: {}

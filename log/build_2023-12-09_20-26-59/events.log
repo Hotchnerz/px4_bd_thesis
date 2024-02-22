@@ -1,0 +1,5 @@
+[0.000000] (-) TimerEvent: {}
+[0.000083] (-) JobUnselected: {'identifier': 'flight_test'}
+[0.000098] (-) JobUnselected: {'identifier': 'px4_msgs'}
+[0.000107] (-) JobUnselected: {'identifier': 'px4_ros_com'}
+[0.000114] (-) EventReactorShutdown: {}

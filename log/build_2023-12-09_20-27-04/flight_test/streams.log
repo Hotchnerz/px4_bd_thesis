@@ -1,0 +1,65 @@
+[0.394s] Invoking command in '/home/radam/px4_ros_com_ros2/src/flight_test': PS1=(px4_focal_testbench) \[\e]0;\u@\h: \w\a\]${debian_chroot:+($debian_chroot)}\[\033[01;32m\]\u@\h\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]\$ PYTHONPATH=/home/radam/px4_ros_com_ros2/src/build/flight_test/prefix_override:/home/radam/px4_ros_com_ros2/src/install/flight_test/lib/python3.8/site-packages:${PYTHONPATH} /usr/bin/python3 setup.py egg_info --egg-base ../build/flight_test build --build-base /home/radam/px4_ros_com_ros2/src/build/flight_test/build install --record /home/radam/px4_ros_com_ros2/src/build/flight_test/install.log --install-scripts $base/lib/flight_test --single-version-externally-managed
+[0.460s] /usr/local/lib/python3.8/dist-packages/setuptools/dist.py:472: SetuptoolsDeprecationWarning: Invalid dash-separated options
+[0.460s] !!
+[0.460s] 
+[0.460s]         ********************************************************************************
+[0.460s]         Usage of dash-separated 'script-dir' will not be supported in future
+[0.460s]         versions. Please use the underscore name 'script_dir' instead.
+[0.460s] 
+[0.460s]         By 2024-Sep-26, you need to update your project and remove deprecated calls
+[0.460s]         or your builds will no longer be supported.
+[0.460s] 
+[0.460s]         See https://setuptools.pypa.io/en/latest/userguide/declarative_config.html for details.
+[0.460s]         ********************************************************************************
+[0.460s] 
+[0.460s] !!
+[0.460s]   opt = self.warn_dash_deprecation(opt, section)
+[0.498s] running egg_info
+[0.498s] creating ../build/flight_test/flight_test.egg-info
+[0.504s] writing ../build/flight_test/flight_test.egg-info/PKG-INFO
+[0.504s] writing dependency_links to ../build/flight_test/flight_test.egg-info/dependency_links.txt
+[0.504s] writing entry points to ../build/flight_test/flight_test.egg-info/entry_points.txt
+[0.504s] writing requirements to ../build/flight_test/flight_test.egg-info/requires.txt
+[0.504s] writing top-level names to ../build/flight_test/flight_test.egg-info/top_level.txt
+[0.542s] writing manifest file '../build/flight_test/flight_test.egg-info/SOURCES.txt'
+[0.554s] reading manifest file '../build/flight_test/flight_test.egg-info/SOURCES.txt'
+[0.554s] writing manifest file '../build/flight_test/flight_test.egg-info/SOURCES.txt'
+[0.554s] running build
+[0.554s] running build_py
+[0.555s] creating /home/radam/px4_ros_com_ros2/src/build/flight_test/build
+[0.555s] creating /home/radam/px4_ros_com_ros2/src/build/flight_test/build/lib
+[0.555s] creating /home/radam/px4_ros_com_ros2/src/build/flight_test/build/lib/flight_test
+[0.555s] copying flight_test/offboard_test.py -> /home/radam/px4_ros_com_ros2/src/build/flight_test/build/lib/flight_test
+[0.555s] copying flight_test/__init__.py -> /home/radam/px4_ros_com_ros2/src/build/flight_test/build/lib/flight_test
+[0.555s] running install
+[0.555s] /usr/local/lib/python3.8/dist-packages/setuptools/_distutils/cmd.py:66: SetuptoolsDeprecationWarning: setup.py install is deprecated.
+[0.555s] !!
+[0.555s] 
+[0.555s]         ********************************************************************************
+[0.555s]         Please avoid running ``setup.py`` directly.
+[0.555s]         Instead, use pypa/build, pypa/installer or other
+[0.555s]         standards-based tools.
+[0.555s] 
+[0.555s]         See https://blog.ganssle.io/articles/2021/10/setup-py-deprecated.html for details.
+[0.555s]         ********************************************************************************
+[0.555s] 
+[0.555s] !!
+[0.555s]   self.initialize_options()
+[0.558s] running install_lib
+[0.564s] creating /home/radam/px4_ros_com_ros2/src/install/flight_test/lib/python3.8/site-packages/flight_test
+[0.564s] copying /home/radam/px4_ros_com_ros2/src/build/flight_test/build/lib/flight_test/offboard_test.py -> /home/radam/px4_ros_com_ros2/src/install/flight_test/lib/python3.8/site-packages/flight_test
+[0.564s] copying /home/radam/px4_ros_com_ros2/src/build/flight_test/build/lib/flight_test/__init__.py -> /home/radam/px4_ros_com_ros2/src/install/flight_test/lib/python3.8/site-packages/flight_test
+[0.564s] byte-compiling /home/radam/px4_ros_com_ros2/src/install/flight_test/lib/python3.8/site-packages/flight_test/offboard_test.py to offboard_test.cpython-38.pyc
+[0.565s] byte-compiling /home/radam/px4_ros_com_ros2/src/install/flight_test/lib/python3.8/site-packages/flight_test/__init__.py to __init__.cpython-38.pyc
+[0.565s] running install_data
+[0.571s] creating /home/radam/px4_ros_com_ros2/src/install/flight_test/share/ament_index
+[0.571s] creating /home/radam/px4_ros_com_ros2/src/install/flight_test/share/ament_index/resource_index
+[0.571s] creating /home/radam/px4_ros_com_ros2/src/install/flight_test/share/ament_index/resource_index/packages
+[0.571s] copying resource/flight_test -> /home/radam/px4_ros_com_ros2/src/install/flight_test/share/ament_index/resource_index/packages
+[0.571s] copying package.xml -> /home/radam/px4_ros_com_ros2/src/install/flight_test/share/flight_test
+[0.571s] running install_egg_info
+[0.577s] Copying ../build/flight_test/flight_test.egg-info to /home/radam/px4_ros_com_ros2/src/install/flight_test/lib/python3.8/site-packages/flight_test-0.0.0-py3.8.egg-info
+[0.577s] running install_scripts
+[0.597s] Installing offboard script to /home/radam/px4_ros_com_ros2/src/install/flight_test/lib/flight_test
+[0.598s] writing list of installed files to '/home/radam/px4_ros_com_ros2/src/build/flight_test/install.log'
+[0.611s] Invoked command in '/home/radam/px4_ros_com_ros2/src/flight_test' returned '0': PS1=(px4_focal_testbench) \[\e]0;\u@\h: \w\a\]${debian_chroot:+($debian_chroot)}\[\033[01;32m\]\u@\h\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]\$ PYTHONPATH=/home/radam/px4_ros_com_ros2/src/build/flight_test/prefix_override:/home/radam/px4_ros_com_ros2/src/install/flight_test/lib/python3.8/site-packages:${PYTHONPATH} /usr/bin/python3 setup.py egg_info --egg-base ../build/flight_test build --build-base /home/radam/px4_ros_com_ros2/src/build/flight_test/build install --record /home/radam/px4_ros_com_ros2/src/build/flight_test/install.log --install-scripts $base/lib/flight_test --single-version-externally-managed
