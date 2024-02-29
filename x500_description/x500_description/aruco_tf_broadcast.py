@@ -1,11 +1,7 @@
-
-import math
-import numpy as np
+from geometry_msgs.msg import TransformStamped
 import rclpy
 from rclpy.node import Node
 from tf2_ros import TransformBroadcaster
-from tf2_ros.static_transform_broadcaster import StaticTransformBroadcaster
-from geometry_msgs.msg import TransformStamped
 from ros2_aruco_interfaces.msg import ArucoMarkers
 
 
@@ -16,31 +12,10 @@ class FramePublisher(Node):
 
         # Initialize the transform broadcaster
         self.tf_broadcaster = TransformBroadcaster(self)
-        self.tf_static_broadcaster = StaticTransformBroadcaster(self)
-        #self.make_transforms(transformation)
-        self.make_transforms()
 
         #Subscriber
         self.subscription = self.create_subscription(ArucoMarkers, '/aruco_markers', self.handle_aruco_pose, 1)
         self.subscription  # prevent unused variable warning
-    
-    def make_transforms(self):
-        tf_map = TransformStamped()
-
-        tf_map.header.stamp = self.get_clock().now().to_msg()
-        tf_map.header.frame_id = 'map'
-        tf_map.child_frame_id = 'base_link'
-
-        tf_map.transform.translation.x = float(0)
-        tf_map.transform.translation.y = float(0)
-        tf_map.transform.translation.z = float(0)
-
-        tf_map.transform.rotation.x = float(0)
-        tf_map.transform.rotation.y = float(0)
-        tf_map.transform.rotation.z = float(0)
-        tf_map.transform.rotation.w = float(0)
-
-        self.tf_static_broadcaster.sendTransform(tf_map)
 
     def handle_aruco_pose(self, msg):
         t = TransformStamped()
@@ -70,7 +45,6 @@ class FramePublisher(Node):
 def main():
     rclpy.init()
     node = FramePublisher()
-
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:
