@@ -27,7 +27,8 @@ setup(
             'test_offboard = flight_test.offboard_test:main',
             'old_offboard = flight_test.old_offboard:main',
             'offboard_perch = flight_test.offboard_perch:main',
-            'control = flight_test.control:main'
+            'control = flight_test.control:main',
+            'offboard_playground = flight_test.offboard_playground:main'
         ],
     },
 )

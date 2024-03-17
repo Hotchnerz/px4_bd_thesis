@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 ############################################################################
 #
 #   Copyright (C) 2022 PX4 Development Team. All rights reserved.
@@ -44,7 +43,6 @@ from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy, QoSDur
 from px4_msgs.msg import OffboardControlMode
 from px4_msgs.msg import TrajectorySetpoint
 from px4_msgs.msg import VehicleStatus
-from px4_msgs.msg import CommanderState
 
 
 class OffboardControl(Node):
@@ -91,15 +89,12 @@ class OffboardControl(Node):
         if self.nav_state == VehicleStatus.NAVIGATION_STATE_OFFBOARD:
 
             trajectory_msg = TrajectorySetpoint()
-            trajectory_msg.x= self.radius * np.cos(self.theta)
+            trajectory_msg.x = self.radius * np.cos(self.theta)
             trajectory_msg.y = self.radius * np.sin(self.theta)
             trajectory_msg.z = -5.0
             self.publisher_trajectory.publish(trajectory_msg)
 
             self.theta = self.theta + self.omega * self.dt
-        else:
-            print("WAITING FOR OFFBOARD SIGNAL")
-
 
 def main(args=None):
     rclpy.init(args=args)
