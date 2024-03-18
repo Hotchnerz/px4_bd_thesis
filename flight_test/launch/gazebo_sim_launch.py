@@ -26,13 +26,18 @@ def generate_launch_description():
         package="x500_description",
         executable="map_tf_broadcaster"
     )
-    aruco_node = Node(
+    aruco_tf_node = Node(
         package="x500_description",
         executable="aruco_tf_broadcaster"
+    )
+    aruco_baselink = Node(
+        package="x500_description",
+        executable="aruco_transform"
     )
     
     ld.add_action(gazebo_aruco_node)
     ld.add_action(drone_urdf_launch)
     ld.add_action(map_node)
-    ld.add_action(aruco_node)
+    ld.add_action(aruco_tf_node)
+    ld.add_action(aruco_baselink)
     return ld

@@ -29,7 +29,8 @@ setup(
     entry_points={
         'console_scripts': [
             'aruco_tf_broadcaster = x500_description.aruco_tf_broadcast:main',
-            'map_tf_broadcaster = x500_description.map_tf_broadcast:main'
+            'map_tf_broadcaster = x500_description.map_tf_broadcast:main',
+            'aruco_transform = x500_description.aruco_transform:main'
         ],
     },
 )

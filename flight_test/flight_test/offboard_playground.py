@@ -1,6 +1,8 @@
 import rclpy
 import numpy as np
 import time
+import tf2_ros
+from geometry_msgs.msg import Pose
 from rclpy.node import Node
 from rclpy.clock import Clock
 from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy, QoSDurabilityPolicy
@@ -38,6 +40,7 @@ class OffboardControl(Node):
             (2.0, -2.0, -1.5, 0.0)
         ]
 
+
         self.curr_x, self.curr_y, self.curr_z = 0.0, 0.0, 0.0
         self.aruco_x, self.aruco_y, self.aruco_z = 0.0, 0.0, 0.0
         self.aruco_qx, self.aruco_qy, self.aruco_qz, self.aruco_qw = 0.0, 0.0, 0.0, 0.0
@@ -66,23 +69,46 @@ class OffboardControl(Node):
         self.curr_z = msg.z
         self.curr_q = msg.q
         #print(self.curr_z)
+
+    def transform_pose(self, input_pose, current_frame, new_frame):
+        # **Assuming /tf2 topic is being broadcasted
+        self.tf_buffer = tf2_ros.Buffer()
+        self.listener = tf2_ros.TransformListener(self.tf_buffer, self)
+
+        pose_stamped = tf2_geometry_msgs.PoseStamped()
+        pose_stamped.pose = input_pose
+        pose_stamped.header.frame_id = from_frame
+        pose_stamped.header.stamp = rospy.Time.now()
+
+        try:
+            # ** It is important to wait for the listener to start listening. Hence the rospy.Duration(1)
+            self.output_pose_stamped = self.tf_buffer.transform(pose_stamped, to_frame, rospy.Duration(1))
+            return self.output_pose_stamped.pose
+
+        except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
+            raise
     
     def aruco_callback(self, msg):
         self.arucoID = msg.marker_ids[0]
-        self.aruco_x = msg.poses[0].position.x
-        self.aruco_y = msg.poses[0].position.y
-        self.aruco_z = msg.poses[0].position.z
+        # self.aruco_x = msg.poses[0].position.x
+        # self.aruco_y = msg.poses[0].position.y
+        # self.aruco_z = msg.poses[0].position.z
 
-        self.aruco_qx = msg.poses[0].orientation.x
-        self.aruco_qy = msg.poses[0].orientation.y
-        self.aruco_qz = msg.poses[0].orientation.z
-        self.aruco_qw = msg.poses[0].orientation.w
+        # self.aruco_qx = msg.poses[0].orientation.x
+        # self.aruco_qy = msg.poses[0].orientation.y
+        # self.aruco_qz = msg.poses[0].orientation.z
+        # self.aruco_qw = msg.poses[0].orientation.w
+
+        #self.aruco_q = [self.aruco_qx, self.aruco_qy, self.aruco_qz, self.aruco_qw]
+        #self.aruco_roll, self.aruco_pitch, self.aruco_yaw = euler_from_quaternion(self.aruco_q)
+
+        aruco_cl_pose = msg.poses[0]
 
         self.aruco_q = [self.aruco_qx, self.aruco_qy, self.aruco_qz, self.aruco_qw]
         self.aruco_roll, self.aruco_pitch, self.aruco_yaw = euler_from_quaternion(self.aruco_q)
 
         
-        print(self.aruco_x)
+        print("Aruco y: ", self.aruco_y)
         print(self.aruco_yaw)
 
     

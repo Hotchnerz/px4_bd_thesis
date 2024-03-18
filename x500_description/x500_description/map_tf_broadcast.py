@@ -30,13 +30,14 @@ class MapFramePublisher(Node):
         # Read msg and store in the transformed stamped object t.
         t.header.stamp = self.get_clock().now().to_msg()
         t.header.frame_id = 'map'
-        t.child_frame_id = 'base_link'
+        t.child_frame_id = 'base_footprint'
 
         #Aruco markers msg stores geometry/msgs poses messages in an array called poses.
         #Take this pose information and broadcast as a transform.
         t.transform.translation.x = msg.x
         t.transform.translation.y = msg.y*-1
-        t.transform.translation.z = (msg.z - 0.184)*-1
+        #t.transform.translation.z = (msg.z - 0.184)*-1
+        t.transform.translation.z = (msg.z)*-1
         #Height of drone from base_link is 0.21528
 
         t.transform.rotation.x = q_rotate[0]
