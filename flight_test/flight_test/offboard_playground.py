@@ -5,7 +5,9 @@ from rclpy.node import Node
 from rclpy.clock import Clock
 from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy, QoSDurabilityPolicy
 
+from tf_transformations import euler_from_quaternion
 from px4_msgs.msg import OffboardControlMode, TrajectorySetpoint, VehicleStatus, VehicleCommand, Timesync, VehicleOdometry
+from ros2_aruco_interfaces.msg import ArucoMarkers
 
 class OffboardControl(Node):
 
@@ -28,19 +30,25 @@ class OffboardControl(Node):
         self.drone_status_sub = self.create_subscription(VehicleStatus, '/fmu/vehicle_status/out', self.vehicle_status_callback, qos_profile)
         self.timesync_subscriber = self.create_subscription(Timesync, '/fmu/timesync/out', self.timesync_callback, 10)
         self.odom_subscriber = self.create_subscription(VehicleOdometry, '/fmu/vehicle_odometry/out', self.odom_callback, 10)
+        self.aruco_subscriber = self.create_subscription(ArucoMarkers, '/aruco_markers', self.aruco_callback, 10)
 
         self.setpoints = [
-            (0.0, -0.0, -1.5, 0.0), 
+            (0.0, -0.0, -0.5, 0.0), 
             (1.0, -0.0, -1.5, 0.0), 
             (2.0, -2.0, -1.5, 0.0)
         ]
 
         self.curr_x, self.curr_y, self.curr_z = 0.0, 0.0, 0.0
+        self.aruco_x, self.aruco_y, self.aruco_z = 0.0, 0.0, 0.0
+        self.aruco_qx, self.aruco_qy, self.aruco_qz, self.aruco_qw = 0.0, 0.0, 0.0, 0.0
+        self.aruco_roll, self.aruco_pitch, self.aruco_yaw = 0.0, 0.0, 0.0
+        self.aruco_q =[]
         self.curr_q = []
         self.timestamp = 0
         self.offboard_counter = 0
         self.current_setpoint_index = 0
         self.nav_state = VehicleStatus.NAVIGATION_STATE_MAX
+        self.arucoID = 144
         
         timer_period = 0.02  # seconds
         self.timer = self.create_timer(timer_period, self.cmdloop_callback)
@@ -57,7 +65,26 @@ class OffboardControl(Node):
         self.curr_y = msg.y
         self.curr_z = msg.z
         self.curr_q = msg.q
-        print(self.curr_z)
+        #print(self.curr_z)
+    
+    def aruco_callback(self, msg):
+        self.arucoID = msg.marker_ids[0]
+        self.aruco_x = msg.poses[0].position.x
+        self.aruco_y = msg.poses[0].position.y
+        self.aruco_z = msg.poses[0].position.z
+
+        self.aruco_qx = msg.poses[0].orientation.x
+        self.aruco_qy = msg.poses[0].orientation.y
+        self.aruco_qz = msg.poses[0].orientation.z
+        self.aruco_qw = msg.poses[0].orientation.w
+
+        self.aruco_q = [self.aruco_qx, self.aruco_qy, self.aruco_qz, self.aruco_qw]
+        self.aruco_roll, self.aruco_pitch, self.aruco_yaw = euler_from_quaternion(self.aruco_q)
+
+        
+        print(self.aruco_x)
+        print(self.aruco_yaw)
+
     
     
     def arm(self):
@@ -136,8 +163,8 @@ class OffboardControl(Node):
 
         if self.nav_state == VehicleStatus.NAVIGATION_STATE_OFFBOARD:
             self.trajectory_setpoint_publisher()
-            self.current_setpoint_index = 1
-            self.trajectory_setpoint_publisher()
+            #self.current_setpoint_index = 1
+            #self.trajectory_setpoint_publisher()
 
         
         # if self.nav_state == VehicleStatus.NAVIGATION_STATE_OFFBOARD:

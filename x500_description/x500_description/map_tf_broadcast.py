@@ -36,7 +36,7 @@ class MapFramePublisher(Node):
         #Take this pose information and broadcast as a transform.
         t.transform.translation.x = msg.x
         t.transform.translation.y = msg.y*-1
-        t.transform.translation.z = (msg.z + 0.184)
+        t.transform.translation.z = (msg.z - 0.184)*-1
         #Height of drone from base_link is 0.21528
 
         t.transform.rotation.x = q_rotate[0]
