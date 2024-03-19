@@ -6,6 +6,7 @@ from geometry_msgs.msg import Pose
 from rclpy.node import Node
 from rclpy.clock import Clock
 from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy, QoSDurabilityPolicy
+import time
 
 from tf_transformations import euler_from_quaternion
 from px4_msgs.msg import OffboardControlMode, TrajectorySetpoint, VehicleStatus, VehicleCommand, Timesync, VehicleOdometry
@@ -33,12 +34,7 @@ class OffboardControl(Node):
         self.timesync_subscriber = self.create_subscription(Timesync, '/fmu/timesync/out', self.timesync_callback, 10)
         self.odom_subscriber = self.create_subscription(VehicleOdometry, '/fmu/vehicle_odometry/out', self.odom_callback, 10)
         self.aruco_subscriber = self.create_subscription(ArucoMarkers, '/aruco_markers', self.aruco_callback, 10)
-
-        self.setpoints = [
-            (0.0, -0.0, -0.5, 0.0), 
-            (1.0, -0.0, -1.5, 0.0), 
-            (2.0, -2.0, -1.5, 0.0)
-        ]
+        self.aruco_baselink_subscriber = self.create_subscription(Pose, '/aruco_baselink', self.aruco_baselink_callback, 10)
 
 
         self.curr_x, self.curr_y, self.curr_z = 0.0, 0.0, 0.0
@@ -51,7 +47,16 @@ class OffboardControl(Node):
         self.offboard_counter = 0
         self.current_setpoint_index = 0
         self.nav_state = VehicleStatus.NAVIGATION_STATE_MAX
-        self.arucoID = 144
+        self.arucoID = 0
+        self.arucoFound = False
+        self.start_time = time.time()
+        self.exec_time = 0
+
+        self.setpoints = [
+            (0.0, -0.0, -1.5, 0.0), 
+            (1.0, -0.0, -1.5, 0.0), 
+            (self.aruco_x, -self.aruco_y, -1.5, 0.0)
+        ]
         
         timer_period = 0.02  # seconds
         self.timer = self.create_timer(timer_period, self.cmdloop_callback)
@@ -69,24 +74,6 @@ class OffboardControl(Node):
         self.curr_z = msg.z
         self.curr_q = msg.q
         #print(self.curr_z)
-
-    def transform_pose(self, input_pose, current_frame, new_frame):
-        # **Assuming /tf2 topic is being broadcasted
-        self.tf_buffer = tf2_ros.Buffer()
-        self.listener = tf2_ros.TransformListener(self.tf_buffer, self)
-
-        pose_stamped = tf2_geometry_msgs.PoseStamped()
-        pose_stamped.pose = input_pose
-        pose_stamped.header.frame_id = from_frame
-        pose_stamped.header.stamp = rospy.Time.now()
-
-        try:
-            # ** It is important to wait for the listener to start listening. Hence the rospy.Duration(1)
-            self.output_pose_stamped = self.tf_buffer.transform(pose_stamped, to_frame, rospy.Duration(1))
-            return self.output_pose_stamped.pose
-
-        except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
-            raise
     
     def aruco_callback(self, msg):
         self.arucoID = msg.marker_ids[0]
@@ -98,11 +85,30 @@ class OffboardControl(Node):
         # self.aruco_qy = msg.poses[0].orientation.y
         # self.aruco_qz = msg.poses[0].orientation.z
         # self.aruco_qw = msg.poses[0].orientation.w
+        print(self.arucoID)
 
         #self.aruco_q = [self.aruco_qx, self.aruco_qy, self.aruco_qz, self.aruco_qw]
         #self.aruco_roll, self.aruco_pitch, self.aruco_yaw = euler_from_quaternion(self.aruco_q)
 
-        aruco_cl_pose = msg.poses[0]
+        # aruco_cl_pose = msg.poses[0]
+
+        # self.aruco_q = [self.aruco_qx, self.aruco_qy, self.aruco_qz, self.aruco_qw]
+        # self.aruco_roll, self.aruco_pitch, self.aruco_yaw = euler_from_quaternion(self.aruco_q)
+
+        
+        # print("Aruco y: ", self.aruco_y)
+        # print(self.aruco_yaw)
+    
+    def aruco_baselink_callback(self, msg):
+        self.aruco_x = msg.position.x
+        self.aruco_y = msg.position.y
+        self.aruco_z = msg.position.z
+
+        self.aruco_qx = msg.orientation.x
+        self.aruco_qy = msg.orientation.y
+        self.aruco_qz = msg.orientation.z
+        self.aruco_qw = msg.orientation.w
+
 
         self.aruco_q = [self.aruco_qx, self.aruco_qy, self.aruco_qz, self.aruco_qw]
         self.aruco_roll, self.aruco_pitch, self.aruco_yaw = euler_from_quaternion(self.aruco_q)
@@ -168,36 +174,56 @@ class OffboardControl(Node):
         self.timestamp = msg.timestamp
 
 
-    def trajectory_setpoint_publisher(self):
+    def trajectory_setpoint_publisher(self, setpoint, index):
         msg = TrajectorySetpoint()
         msg.timestamp = self.timestamp
-        msg.x, msg.y, msg.z, msg.yaw = self.setpoints[self.current_setpoint_index]
+        msg.x, msg.y, msg.z, msg.yaw = setpoint[index]
         self.trajectory_pub.publish(msg)
 
 
     def cmdloop_callback(self):
         # Publish offboard control modes
         self.publish_offboard_heartbeat()
+        self.exec_time = time.time() - self.start_time
 
         if self.offboard_counter == 10:
             self.arm()
             self.offboard_activate()
             
-        
         if self.offboard_counter < 11:
             self.offboard_counter += 1
 
         if self.nav_state == VehicleStatus.NAVIGATION_STATE_OFFBOARD:
-            self.trajectory_setpoint_publisher()
+            #Go to Takeoff
+            self.trajectory_setpoint_publisher(self.setpoints, self.current_setpoint_index)
             #self.current_setpoint_index = 1
             #self.trajectory_setpoint_publisher()
+            if  self.curr_z < -1.50 and self.curr_z > -1.60:
+                self.current_setpoint_index = 1
+                self.trajectory_setpoint_publisher(self.setpoints, self.current_setpoint_index)
+                
+                if self.arucoID == 122 and self.exec_time < 25:
+                    self.arucoFound = True
+                    arucoSetpoints = [
+                        (self.aruco_x, -self.aruco_y, -1.5, 0.0)
+                    ]
+                    self.trajectory_setpoint_publisher(arucoSetpoints, 0)
+
+
+
+                elif self.arucoFound == False and self.exec_time > 35:
+                    self.current_setpoint_index = 0
+                    self.trajectory_setpoint_publisher(self.setpoints, self.current_setpoint_index)
+                    if (-0.08 < self.curr_x < 0.08) and (-0.08 < self.curr_y < 0.08):
+                        self.land()
+
 
         
         # if self.nav_state == VehicleStatus.NAVIGATION_STATE_OFFBOARD:
             
         #     active_setpoint = self.setpoints[0];
 
-        #     trajectory_msg = TrajectorySetpoint()
+        #     trajectory_msg = Trajectory   if 1.48 < self.curr_z < 1.52Setpoint()
         #     trajectory_msg.x = active_setpoint[0]
         #     trajectory_msg.y = active_setpoint[1]
         #     trajectory_msg.z = active_setpoint[2]
