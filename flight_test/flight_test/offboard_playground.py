@@ -56,11 +56,15 @@ class OffboardControl(Node):
         self.current_setpoint_index = 0
         self.nav_state = VehicleStatus.NAVIGATION_STATE_MAX
         self.arucoID = 0
+        self.posCounter = 0
         self.takeoff = False
         self.arucoFound = False
+        self.FirstStage = False
+        self.SecondStage = False
         self.start_time = time.time()
         self.exec_time = 0
         self.desired_z = -1.5
+        self.first_x, self.first_y, self.new_x, self.new_y = 0.0, 0.0, 0.0, 0.0
 
         self.setpoints = [
             (0.0, -0.0, -1.5, 0.0), 
@@ -187,22 +191,6 @@ class OffboardControl(Node):
         msg.x, msg.y, msg.z, msg.yaw = setpoint[index]
         self.trajectory_pub.publish(msg)
 
-    #def setpointCheck(self):
-    # def PID_X(self, setpoint, measurement):
-
-    #     e = setpoint - measurement
-
-    #     P = self.Kp_x*e
-    #     self.integral_x = self.integral_x + self.Ki_x*e*(self.start_time-self.time_prev_x)
-    #     D = self.Kd_x*(e - self.error_x)/(self.start_time-self.time_prev_x)
-
-    #     value = P + self.integral_x + D
-
-    #     self.error_x = e
-    #     self.time_prev_x = time.time()
-    #     return value
-    
-
 
 
     def cmdloop_callback(self):
@@ -228,61 +216,79 @@ class OffboardControl(Node):
                 self.current_setpoint_index = 1
                 self.trajectory_setpoint_publisher(self.setpoints, self.current_setpoint_index)
                 
-            
-            # if self.exec_time > 25:
-            #     self.arucoLand()
             #If aruco found, go sit on it
             if self.arucoID == 122 and self.exec_time > 25:
+                
                 self.arucoFound = True
+                # arucoSetpoints = [
+                #     (self.aruco_x - 0.2, -self.aruco_y, self.desired_z, 0.0)
+                # ]
+                # self.trajectory_setpoint_publisher(arucoSetpoints, 0)
+                while self.posCounter != 10:
+                    self.first_x = self.first_x + self.aruco_x
+                    self.first_y = self.first_y+ self.aruco_y
+                    self.posCounter += 1
+
+                self.new_x = self.first_x /10.0
+                self.new_y = self.first_y /10.0
+
                 arucoSetpoints = [
-                    (self.aruco_x - 0.2, -self.aruco_y, self.desired_z, 0.0)
+                    (self.new_x, -self.new_y, self.desired_z, 0.0)
                 ]
+
                 self.trajectory_setpoint_publisher(arucoSetpoints, 0)
+                if self.exec_time > 28:
+                    if self.curr_z <= -0.8:
+                        self.desired_z += 0.002
+                self.FirstStage = True
+                self.posCounter = 0
+                self.first_x, self.first_y = 0.0, 0.0
+
+                if self.FirstStage == True and self.curr_z >= -0.8:
+                    while self.posCounter != 10:
+                        self.first_x = self.first_x + self.aruco_x
+                        self.first_y = self.first_y+ self.aruco_y
+                        self.posCounter += 1
+
+                    self.new_x = self.first_x /10.0
+                    self.new_y = self.first_y /10.0
+
+                    arucoSetpoints = [
+                        (self.new_x, -self.new_y, self.desired_z, 0.0)
+                    ]
+                    self.SecondStage = True
+                    self.trajectory_setpoint_publisher(arucoSetpoints, 0)
+
+                #if self.SecondStage == True and self.exec_time > 30:
+                    self.desired_z += 0.002
+                    if self.curr_z >= -0.10:
+                        self.land()
+                    
+
+
+
+                    # self.land()
+                    # self.disarm()
+
+                    # if self.exec_time > 30:
+                    #     if self.curr_z <= -0.1:
+                    #         self.desired_z += 0.002
+                    # if self.curr_z > -0.30:
+                    #     self.trajectory_setpoint_publisher(arucoSetpoints, 0)
+                    #     self.land()
+
+
+
+                
 
                 # if self.exec_time > 30:
-                #     if self.curr_z <= -0.45:
+                #     if self.curr_z <= -0.40:
                 #         self.desired_z += 0.002
-                #         self.new_x = self.PID_X(self.aruco_x, self.curr_x)
-                #         arucoSetpoints = [(self.new_x, self.aruco_y, self.desired_z, 0.0)]
-                #         self.trajectory_setpoint_publisher(arucoSetpoints, 0)
-                #         print(self.new_x)
-                #     # if self.curr_z < 0.9 and abs(error_x) < 0.08 and abs(error_y) < 0.08:
-                #     #     self.z += 0.01
-                #     if self.curr_z > -0.4:
+                #     if self.curr_z > -0.40:
                 #         self.land()
-                # arucoSetpoints = [(self.aruco_x, self.aruco_y, self.desired_z, 0.0)]
-                # self.trajectory_setpoint_publisher(arucoSetpoints, 0)
-                if self.exec_time > 30:
-                    if self.curr_z <= -0.40:
-                        self.desired_z += 0.002
-                    # if self.curr_z < 0.9 and abs(error_x) < 0.08 and abs(error_y) < 0.08:
-                    #     self.z += 0.01
-                    if self.curr_z > -0.40:
-                        self.land()
 
                 # elif self.arucoID != 122:
                 #     self.arucoFound = False
-
-
-                # elif self.arucoFound == False and self.exec_time > 35:
-                #     self.current_setpoint_index = 0
-                #     self.trajectory_setpoint_publisher(self.setpoints, self.current_setpoint_index)
-                #     if (-0.08 < self.curr_x < 0.08) and (-0.08 < self.curr_y < 0.08):
-                #         self.land()
-
-
-        
-        # if self.nav_state == VehicleStatus.NAVIGATION_STATE_OFFBOARD:
-            
-        #     active_setpoint = self.setpoints[0];
-
-        #     trajectory_msg = Trajectory   if 1.48 < self.curr_z < 1.52Setpoint()
-        #     trajectory_msg.x = active_setpoint[0]
-        #     trajectory_msg.y = active_setpoint[1]
-        #     trajectory_msg.z = active_setpoint[2]
-        #     trajectory_msg.yaw = active_setpoint[3]
-
-        #     self.trajectory_pub.publish(trajectory_msg)
 
 def main(args=None):
     rclpy.init(args=args)
