@@ -41,8 +41,16 @@ class OffboardControl(Node):
         self.aruco_x, self.aruco_y, self.aruco_z = 0.0, 0.0, 0.0
         self.aruco_qx, self.aruco_qy, self.aruco_qz, self.aruco_qw = 0.0, 0.0, 0.0, 0.0
         self.aruco_roll, self.aruco_pitch, self.aruco_yaw = 0.0, 0.0, 0.0
+        self.Kp_x = 1.0
+        self.Ki_x = 0.1
+        self.Kd_x = 0.1
+        self.error_x, self.error_y = 0.0, 0.0
+        self.time_prev_x = 0
+        self.integral_x, self.integral_y = 0.0, 0.0
+        self.Kp_y, self.Ki_y, self. Kd_z = 0.0, 0.0, 0.0
         self.aruco_q =[]
         self.curr_q = []
+        self.new_x = 0.0
         self.timestamp = 0
         self.offboard_counter = 0
         self.current_setpoint_index = 0
@@ -181,6 +189,20 @@ class OffboardControl(Node):
         self.trajectory_pub.publish(msg)
 
     #def setpointCheck(self):
+    def PID_X(self, setpoint, measurement):
+
+        e = setpoint - measurement
+
+        P = self.Kp_x*e
+        self.integral_x = self.integral_x + self.Ki_x*e*(self.start_time-self.time_prev_x)
+        D = self.Kd_x*(e - self.error_x)/(self.start_time-self.time_prev_x)
+
+        value = P + self.integral_x + D
+
+        self.error_x = e
+        self.time_prev_x = time.time()
+        return value
+
 
 
     def cmdloop_callback(self):
@@ -219,10 +241,11 @@ class OffboardControl(Node):
 
                 if self.exec_time > 30:
                     if self.curr_z <= -0.45:
-                        self.desired_z += 0.005
-                        
-                        arucoSetpoints = [(self.aruco_x, self.aruco_y, self.desired_z, 0.0)]
+                        self.desired_z += 0.002
+                        self.new_x = self.PID_X(self.aruco_x, self.curr_x)
+                        arucoSetpoints = [(self.new_x, self.aruco_y, self.desired_z, 0.0)]
                         self.trajectory_setpoint_publisher(arucoSetpoints, 0)
+                        print(self.new_x)
                     # if self.curr_z < 0.9 and abs(error_x) < 0.08 and abs(error_y) < 0.08:
                     #     self.z += 0.01
                     if self.curr_z > -0.4:
