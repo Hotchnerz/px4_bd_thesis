@@ -143,8 +143,7 @@ class OffboardControl(Node):
     def land(self):
         self.publish_vehicle_command(VehicleCommand.VEHICLE_CMD_NAV_LAND)
         self.get_logger().info('Landing initiated')
-        time.sleep(5)
-        self.disarm()
+        #self.disarm()
     
 
     def offboard_activate(self):
@@ -189,19 +188,20 @@ class OffboardControl(Node):
         self.trajectory_pub.publish(msg)
 
     #def setpointCheck(self):
-    def PID_X(self, setpoint, measurement):
+    # def PID_X(self, setpoint, measurement):
 
-        e = setpoint - measurement
+    #     e = setpoint - measurement
 
-        P = self.Kp_x*e
-        self.integral_x = self.integral_x + self.Ki_x*e*(self.start_time-self.time_prev_x)
-        D = self.Kd_x*(e - self.error_x)/(self.start_time-self.time_prev_x)
+    #     P = self.Kp_x*e
+    #     self.integral_x = self.integral_x + self.Ki_x*e*(self.start_time-self.time_prev_x)
+    #     D = self.Kd_x*(e - self.error_x)/(self.start_time-self.time_prev_x)
 
-        value = P + self.integral_x + D
+    #     value = P + self.integral_x + D
 
-        self.error_x = e
-        self.time_prev_x = time.time()
-        return value
+    #     self.error_x = e
+    #     self.time_prev_x = time.time()
+    #     return value
+    
 
 
 
@@ -235,20 +235,29 @@ class OffboardControl(Node):
             if self.arucoID == 122 and self.exec_time > 25:
                 self.arucoFound = True
                 arucoSetpoints = [
-                    (self.aruco_x, self.aruco_y, self.desired_z, 0.0)
+                    (self.aruco_x - 0.2, -self.aruco_y, self.desired_z, 0.0)
                 ]
                 self.trajectory_setpoint_publisher(arucoSetpoints, 0)
 
+                # if self.exec_time > 30:
+                #     if self.curr_z <= -0.45:
+                #         self.desired_z += 0.002
+                #         self.new_x = self.PID_X(self.aruco_x, self.curr_x)
+                #         arucoSetpoints = [(self.new_x, self.aruco_y, self.desired_z, 0.0)]
+                #         self.trajectory_setpoint_publisher(arucoSetpoints, 0)
+                #         print(self.new_x)
+                #     # if self.curr_z < 0.9 and abs(error_x) < 0.08 and abs(error_y) < 0.08:
+                #     #     self.z += 0.01
+                #     if self.curr_z > -0.4:
+                #         self.land()
+                # arucoSetpoints = [(self.aruco_x, self.aruco_y, self.desired_z, 0.0)]
+                # self.trajectory_setpoint_publisher(arucoSetpoints, 0)
                 if self.exec_time > 30:
-                    if self.curr_z <= -0.45:
+                    if self.curr_z <= -0.40:
                         self.desired_z += 0.002
-                        self.new_x = self.PID_X(self.aruco_x, self.curr_x)
-                        arucoSetpoints = [(self.new_x, self.aruco_y, self.desired_z, 0.0)]
-                        self.trajectory_setpoint_publisher(arucoSetpoints, 0)
-                        print(self.new_x)
                     # if self.curr_z < 0.9 and abs(error_x) < 0.08 and abs(error_y) < 0.08:
                     #     self.z += 0.01
-                    if self.curr_z > -0.4:
+                    if self.curr_z > -0.40:
                         self.land()
 
                 # elif self.arucoID != 122:
