@@ -31,10 +31,10 @@ class OffboardControl(Node):
 
         #Subscribers
         self.drone_status_sub = self.create_subscription(VehicleStatus, '/fmu/vehicle_status/out', self.vehicle_status_callback, qos_profile)
-        self.timesync_subscriber = self.create_subscription(Timesync, '/fmu/timesync/out', self.timesync_callback, 10)
-        self.odom_subscriber = self.create_subscription(VehicleOdometry, '/fmu/vehicle_odometry/out', self.odom_callback, 10)
+        self.timesync_subscriber = self.create_subscription(Timesync, '/fmu/timesync/out', self.timesync_callback, qos_profile)
+        self.odom_subscriber = self.create_subscription(VehicleOdometry, '/fmu/vehicle_odometry/out', self.odom_callback, qos_profile)
         self.aruco_subscriber = self.create_subscription(ArucoMarkers, '/aruco_markers', self.aruco_callback, 10)
-        self.aruco_baselink_subscriber = self.create_subscription(Pose, '/aruco_baselink', self.aruco_baselink_callback, 10)
+        self.aruco_baselink_subscriber = self.create_subscription(Pose, '/aruco_baselink', self.aruco_baselink_callback, qos_profile)
 
 
         self.curr_x, self.curr_y, self.curr_z = 0.0, 0.0, 0.0
@@ -48,9 +48,11 @@ class OffboardControl(Node):
         self.current_setpoint_index = 0
         self.nav_state = VehicleStatus.NAVIGATION_STATE_MAX
         self.arucoID = 0
+        self.takeoff = False
         self.arucoFound = False
         self.start_time = time.time()
         self.exec_time = 0
+        self.desired_z = -1.5
 
         self.setpoints = [
             (0.0, -0.0, -1.5, 0.0), 
@@ -64,8 +66,8 @@ class OffboardControl(Node):
     def vehicle_status_callback(self, msg):
         #TODO: handle NED->ENU transformation
         self.nav_state = msg.nav_state
-        print("NAV_STATUS: ", msg.nav_state)
-        print("  - offboard status: ", VehicleStatus.NAVIGATION_STATE_OFFBOARD)
+        # print("NAV_STATUS: ", msg.nav_state)
+        # print("  - offboard status: ", VehicleStatus.NAVIGATION_STATE_OFFBOARD)
 
 
     def odom_callback(self, msg):
@@ -108,14 +110,12 @@ class OffboardControl(Node):
         self.aruco_qy = msg.orientation.y
         self.aruco_qz = msg.orientation.z
         self.aruco_qw = msg.orientation.w
+        #print(self.aruco_x)
 
-
-        self.aruco_q = [self.aruco_qx, self.aruco_qy, self.aruco_qz, self.aruco_qw]
-        self.aruco_roll, self.aruco_pitch, self.aruco_yaw = euler_from_quaternion(self.aruco_q)
-
+        # self.aruco_q = [self.aruco_qx, self.aruco_qy, self.aruco_qz, self.aruco_qw]
+        # self.aruco_roll, self.aruco_pitch, self.aruco_yaw = euler_from_quaternion(self.aruco_q)
         
-        print("Aruco y: ", self.aruco_y)
-        print(self.aruco_yaw)
+
 
     
     
@@ -180,6 +180,8 @@ class OffboardControl(Node):
         msg.x, msg.y, msg.z, msg.yaw = setpoint[index]
         self.trajectory_pub.publish(msg)
 
+    #def setpointCheck(self):
+
 
     def cmdloop_callback(self):
         # Publish offboard control modes
@@ -195,27 +197,46 @@ class OffboardControl(Node):
 
         if self.nav_state == VehicleStatus.NAVIGATION_STATE_OFFBOARD:
             #Go to Takeoff
-            self.trajectory_setpoint_publisher(self.setpoints, self.current_setpoint_index)
-            #self.current_setpoint_index = 1
-            #self.trajectory_setpoint_publisher()
-            if  self.curr_z < -1.50 and self.curr_z > -1.60:
+            if self.takeoff == False:
+                self.trajectory_setpoint_publisher(self.setpoints, self.current_setpoint_index)
+            
+            if  self.curr_z < -1.50 and self.curr_z > -1.60 and (self.arucoFound == False):
+                self.takeoff == True
+                #Go search for Aruco
                 self.current_setpoint_index = 1
                 self.trajectory_setpoint_publisher(self.setpoints, self.current_setpoint_index)
                 
-                if self.arucoID == 122 and self.exec_time < 25:
-                    self.arucoFound = True
-                    arucoSetpoints = [
-                        (self.aruco_x, -self.aruco_y, -1.5, 0.0)
-                    ]
-                    self.trajectory_setpoint_publisher(arucoSetpoints, 0)
+            
+            # if self.exec_time > 25:
+            #     self.arucoLand()
+            #If aruco found, go sit on it
+            if self.arucoID == 122 and self.exec_time > 25:
+                self.arucoFound = True
+                arucoSetpoints = [
+                    (self.aruco_x, self.aruco_y, self.desired_z, 0.0)
+                ]
+                self.trajectory_setpoint_publisher(arucoSetpoints, 0)
 
-
-
-                elif self.arucoFound == False and self.exec_time > 35:
-                    self.current_setpoint_index = 0
-                    self.trajectory_setpoint_publisher(self.setpoints, self.current_setpoint_index)
-                    if (-0.08 < self.curr_x < 0.08) and (-0.08 < self.curr_y < 0.08):
+                if self.exec_time > 30:
+                    if self.curr_z <= -0.45:
+                        self.desired_z += 0.005
+                        
+                        arucoSetpoints = [(self.aruco_x, self.aruco_y, self.desired_z, 0.0)]
+                        self.trajectory_setpoint_publisher(arucoSetpoints, 0)
+                    # if self.curr_z < 0.9 and abs(error_x) < 0.08 and abs(error_y) < 0.08:
+                    #     self.z += 0.01
+                    if self.curr_z > -0.4:
                         self.land()
+
+                # elif self.arucoID != 122:
+                #     self.arucoFound = False
+
+
+                # elif self.arucoFound == False and self.exec_time > 35:
+                #     self.current_setpoint_index = 0
+                #     self.trajectory_setpoint_publisher(self.setpoints, self.current_setpoint_index)
+                #     if (-0.08 < self.curr_x < 0.08) and (-0.08 < self.curr_y < 0.08):
+                #         self.land()
 
 
         
