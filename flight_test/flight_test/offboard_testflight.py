@@ -66,9 +66,14 @@ class OffboardControl(Node):
         self.desired_z = -1.5
         self.first_x, self.first_y, self.new_x, self.new_y = 0.0, 0.0, 0.0, 0.0
 
+        #REMEMBER SETPOINTS ARE IN NED
+        #TO GO UP, -VE Z VALUES
+        #TO GO RIGHT, +VE Y VALUES
+        #TO GO FORWARD, +VE X VALUES
+
         self.setpoints = [
-            (0.0, -0.0, -1.5, 0.0), 
-            (0.0, -0.0, -1.5, 3.14), 
+            (0.0, 0.0, -1.5, 0.0), 
+            (0.0, 1.5, -1.5, 0.0), 
             (self.aruco_x, -self.aruco_y, -1.5, 0.0)
         ]
         
@@ -89,43 +94,6 @@ class OffboardControl(Node):
         self.curr_q = msg.q
         #print(self.curr_z)
     
-    # def aruco_callback(self, msg):
-    #     self.arucoID = msg.marker_ids[0]
-    #     # self.aruco_x = msg.poses[0].position.x
-    #     # self.aruco_y = msg.poses[0].position.y
-    #     # self.aruco_z = msg.poses[0].position.z
-
-    #     # self.aruco_qx = msg.poses[0].orientation.x
-    #     # self.aruco_qy = msg.poses[0].orientation.y
-    #     # self.aruco_qz = msg.poses[0].orientation.z
-    #     # self.aruco_qw = msg.poses[0].orientation.w
-    #     print(self.arucoID)
-
-    #     #self.aruco_q = [self.aruco_qx, self.aruco_qy, self.aruco_qz, self.aruco_qw]
-    #     #self.aruco_roll, self.aruco_pitch, self.aruco_yaw = euler_from_quaternion(self.aruco_q)
-
-    #     # aruco_cl_pose = msg.poses[0]
-
-    #     # self.aruco_q = [self.aruco_qx, self.aruco_qy, self.aruco_qz, self.aruco_qw]
-    #     # self.aruco_roll, self.aruco_pitch, self.aruco_yaw = euler_from_quaternion(self.aruco_q)
-
-        
-    #     # print("Aruco y: ", self.aruco_y)
-    #     # print(self.aruco_yaw)
-    
-    # def aruco_baselink_callback(self, msg):
-    #     self.aruco_x = msg.position.x
-    #     self.aruco_y = msg.position.y
-    #     self.aruco_z = msg.position.z
-
-    #     self.aruco_qx = msg.orientation.x
-    #     self.aruco_qy = msg.orientation.y
-    #     self.aruco_qz = msg.orientation.z
-    #     self.aruco_qw = msg.orientation.w
-    #     #print(self.aruco_x)
-
-    #     # self.aruco_q = [self.aruco_qx, self.aruco_qy, self.aruco_qz, self.aruco_qw]
-    #     # self.aruco_roll, self.aruco_pitch, self.aruco_yaw = euler_from_quaternion(self.aruco_q)
         
     
     
