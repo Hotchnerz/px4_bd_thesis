@@ -12,7 +12,7 @@ from launch_ros.actions import Node
 
 def generate_launch_description():
     # Get the launch directory
-    bringup_dir = get_package_share_directory('drone_urdf')
+    bringup_dir = get_package_share_directory('x500_description')
     launch_dir = os.path.join(bringup_dir, 'launch')
 
     # Launch configuration variables specific to simulation
