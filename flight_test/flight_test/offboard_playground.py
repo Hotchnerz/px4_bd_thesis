@@ -67,9 +67,9 @@ class OffboardControl(Node):
         self.first_x, self.first_y, self.new_x, self.new_y = 0.0, 0.0, 0.0, 0.0
 
         self.setpoints = [
-            (0.0, -0.0, -1.5, 0.0), 
-            (1.0, -0.0, -1.5, 0.0), 
-            (self.aruco_x, -self.aruco_y, -1.5, 0.0)
+            (0.0, 0.0, -1.5, 0.0), 
+            (1.0, 0.0, -1.5, 0.0), 
+            (self.aruco_x, self.aruco_y, -1.5, 0.0)
         ]
         
         timer_period = 0.02  # seconds

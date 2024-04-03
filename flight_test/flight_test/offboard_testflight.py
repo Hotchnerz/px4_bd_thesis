@@ -94,8 +94,6 @@ class OffboardControl(Node):
         self.curr_q = msg.q
         #print(self.curr_z)
     
-        
-    
     
     def arm(self):
         self.publish_vehicle_command(VehicleCommand.VEHICLE_CMD_COMPONENT_ARM_DISARM, 1.0)
