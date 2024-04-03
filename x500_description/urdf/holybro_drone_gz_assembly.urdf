@@ -4,6 +4,7 @@
      For more information, please see http://wiki.ros.org/sw_urdf_exporter -->
 <robot
   name="holybro_drone_assembly">
+  <link name= "base_footprint" />
   <link
     name="base_link">
     <visual>
@@ -123,6 +124,17 @@
       </geometry>
     </collision>
   </link>
+  <joint
+    name="base_joint"
+    type="fixed">
+    <origin
+      xyz="0 0 -0.21528"
+      rpy="3.14 0 0" />
+    <parent
+      link="base_footprint" />
+    <child
+      link="base_link" />
+  </joint>
   <joint
     name="body_link"
     type="fixed">
