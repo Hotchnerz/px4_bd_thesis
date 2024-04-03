@@ -4,6 +4,7 @@
      For more information, please see http://wiki.ros.org/sw_urdf_exporter -->
 <robot
   name="holybro_drone_assembly">
+  <link name= "base_footprint" />
   <link
     name="base_link">
     <visual>
@@ -12,7 +13,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="package://drone_urdf/meshes/visual/base_link.STL" />
+          filename="package://x500_description/meshes/visual/base_link.STL" />
       </geometry>
       <material
         name="">
@@ -26,7 +27,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="package://drone_urdf/meshes/visual/base_link.STL" />
+          filename="package://x500_description/meshes/visual/base_link.STL" />
       </geometry>
     </collision>
   </link>
@@ -52,7 +53,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="package://drone_urdf/meshes/visual/camera_link.STL" />
+          filename="package://x500_description/meshes/visual/camera_link.STL" />
       </geometry>
       <material
         name="">
@@ -66,7 +67,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="package://drone_urdf/meshes/visual/camera_link.STL" />
+          filename="package://x500_description/meshes/visual/camera_link.STL" />
       </geometry>
     </collision>
   </link>
@@ -105,7 +106,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="package://drone_urdf/meshes/visual/body_link.STL" />
+          filename="package://x500_description/meshes/visual/body_link.STL" />
       </geometry>
       <material
         name="">
@@ -119,10 +120,21 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="package://drone_urdf/meshes/visual/body_link.STL" />
+          filename="package://x500_description/meshes/visual/body_link.STL" />
       </geometry>
     </collision>
   </link>
+  <joint
+    name="base_joint"
+    type="fixed">
+    <origin
+      xyz="0 0 -0.21528"
+      rpy="3.14 0 0" />
+    <parent
+      link="base_footprint" />
+    <child
+      link="base_link" />
+  </joint>
   <joint
     name="body_link"
     type="fixed">
