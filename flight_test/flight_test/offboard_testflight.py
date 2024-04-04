@@ -73,7 +73,7 @@ class OffboardControl(Node):
 
         self.setpoints = [
             (0.0, 0.0, -1.5, 0.0), 
-            (0.0, 1.5, -1.5, 0.0), 
+            (1.5, 0.0, -1.5, 0.0), 
             (self.aruco_x, -self.aruco_y, -1.5, 0.0)
         ]
         
@@ -173,8 +173,9 @@ class OffboardControl(Node):
             self.trajectory_setpoint_publisher(self.setpoints, self.current_setpoint_index)
 
             if -1.55 < self.curr_z < -1.4:
-                self.current_setpoint_index = 1
-                self.trajectory_setpoint_publisher(self.setpoints, self.current_setpoint_index)
+                # self.current_setpoint_index = 1
+                # self.trajectory_setpoint_publisher(self.setpoints, self.current_setpoint_index)
+                self.land()
 
             # if 0.9 < self.curr_x <= 1.0 and (-1.55 < self.curr_z < -1.4):
             #     self.land()
