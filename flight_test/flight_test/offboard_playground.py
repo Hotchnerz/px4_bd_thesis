@@ -37,7 +37,8 @@ class OffboardControl(Node):
         self.aruco_baselink_subscriber = self.create_subscription(Pose, '/aruco_baselink', self.aruco_baselink_callback, qos_profile)
 
 
-        self.curr_x, self.curr_y, self.curr_z = 0.0, 0.0, 0.0
+        self.curr_x, self.curr_y, self.curr_z, self.curr_yaw = 0.0, 0.0, 0.0, 0.0
+        self.home_x, self.home_y, self.home_z, self.home_yaw = 0.0, 0.0, 0.0, 0.0
         self.aruco_x, self.aruco_y, self.aruco_z = 0.0, 0.0, 0.0
         self.aruco_qx, self.aruco_qy, self.aruco_qz, self.aruco_qw = 0.0, 0.0, 0.0, 0.0
         self.aruco_roll, self.aruco_pitch, self.aruco_yaw = 0.0, 0.0, 0.0
@@ -67,9 +68,9 @@ class OffboardControl(Node):
         self.first_x, self.first_y, self.new_x, self.new_y = 0.0, 0.0, 0.0, 0.0
 
         self.setpoints = [
-            (0.0, 0.0, -1.5, 0.0), 
-            (1.0, 0.0, -1.5, 0.0), 
-            (self.aruco_x, self.aruco_y, -1.5, 0.0)
+            (self.home_x, self.home_y, -1.25, 0.0), 
+            (self.home_x + 1.0, self.home_y, -1.25, 0.0), 
+            (self.aruco_x, self.aruco_y, -1.25, 0.0)
         ]
         
         timer_period = 0.02  # seconds
@@ -81,13 +82,25 @@ class OffboardControl(Node):
         # print("NAV_STATUS: ", msg.nav_state)
         # print("  - offboard status: ", VehicleStatus.NAVIGATION_STATE_OFFBOARD)
 
-
+    #PX4 quaternions are in Hamilton Convention (w,x,y,z)
     def odom_callback(self, msg):
         self.curr_x = msg.x
         self.curr_y = msg.y
         self.curr_z = msg.z
-        self.curr_q = msg.q
+
+        #Convert Hamilton Conv. to JPL Conv.
+        px4_q = [float(msg.q[1]), float(msg.q[2]), float(msg.q[3]), float(msg.q[0])]
+        euler = euler_from_quaternion(px4_q)
+        self.curr_yaw = euler[2]
         #print(self.curr_z)
+
+    def setHome(self):
+        if self.homeSet == False:
+            self.home_x = self.curr_x
+            self.home_y = self.curr_y
+            self.home_z = self.curr_z
+            self.home_yaw = self.curr_yaw
+            self.homeSet = True
     
     def aruco_callback(self, msg):
         self.arucoID = msg.marker_ids[0]
@@ -135,6 +148,11 @@ class OffboardControl(Node):
         self.publish_vehicle_command(VehicleCommand.VEHICLE_CMD_COMPONENT_ARM_DISARM, 1.0)
         self.get_logger().info('Arm command sent')
 
+    # def setHome(self):
+    #     self.home_x = self.curr_x
+    #     self.home_y = self.curr_y
+    #     self.home_z = self.curr_z
+    #     self.home_q = euler_from_quaternion(self.cur)
 
     def disarm(self):
         self.publish_vehicle_command(VehicleCommand.VEHICLE_CMD_COMPONENT_ARM_DISARM, 0.0)
@@ -210,7 +228,7 @@ class OffboardControl(Node):
             if self.takeoff == False:
                 self.trajectory_setpoint_publisher(self.setpoints, self.current_setpoint_index)
             
-            if  self.curr_z < -1.50 and self.curr_z > -1.60 and (self.arucoFound == False):
+            if  (-1.3 < self.curr_z < -1.2) and (self.arucoFound == False):
                 self.takeoff == True
                 #Go search for Aruco
                 self.current_setpoint_index = 1
@@ -236,6 +254,7 @@ class OffboardControl(Node):
                     (self.new_x, -self.new_y, self.desired_z, 0.0)
                 ]
 
+                #DRONE NEEDS TO BE STOPPED BEFORE SENDING
                 self.trajectory_setpoint_publisher(arucoSetpoints, 0)
                 if self.exec_time > 28:
                     if self.curr_z <= -0.8:

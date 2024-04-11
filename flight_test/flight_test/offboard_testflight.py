@@ -33,14 +33,11 @@ class OffboardControl(Node):
         self.drone_status_sub = self.create_subscription(VehicleStatus, '/fmu/vehicle_status/out', self.vehicle_status_callback, qos_profile)
         self.timesync_subscriber = self.create_subscription(Timesync, '/fmu/timesync/out', self.timesync_callback, qos_profile)
         self.odom_subscriber = self.create_subscription(VehicleOdometry, '/fmu/vehicle_odometry/out', self.odom_callback, qos_profile)
-        # self.aruco_subscriber = self.create_subscription(ArucoMarkers, '/aruco_markers', self.aruco_callback, 10)
-        # self.aruco_baselink_subscriber = self.create_subscription(Pose, '/aruco_baselink', self.aruco_baselink_callback, qos_profile)
 
 
-        self.curr_x, self.curr_y, self.curr_z = 0.0, 0.0, 0.0
-        self.aruco_x, self.aruco_y, self.aruco_z = 0.0, 0.0, 0.0
-        self.aruco_qx, self.aruco_qy, self.aruco_qz, self.aruco_qw = 0.0, 0.0, 0.0, 0.0
-        self.aruco_roll, self.aruco_pitch, self.aruco_yaw = 0.0, 0.0, 0.0
+
+        self.curr_x, self.curr_y, self.curr_z, self.curr_yaw = 0.0, 0.0, 0.0, 0.0
+        self.home_x, self.home_y, self.home_z, self.home_yaw = 0.0, 0.0, 0.0, 0.0
         self.Kp_x = 1.0
         self.Ki_x = 0.1
         self.Kd_x = 0.1
@@ -57,6 +54,7 @@ class OffboardControl(Node):
         self.nav_state = VehicleStatus.NAVIGATION_STATE_MAX
         self.arucoID = 0
         self.posCounter = 0
+        self.homeSet = False
         self.takeoff = False
         self.arucoFound = False
         self.FirstStage = False
@@ -66,15 +64,10 @@ class OffboardControl(Node):
         self.desired_z = -1.5
         self.first_x, self.first_y, self.new_x, self.new_y = 0.0, 0.0, 0.0, 0.0
 
-        #REMEMBER SETPOINTS ARE IN NED
-        #TO GO UP, -VE Z VALUES
-        #TO GO RIGHT, +VE Y VALUES
-        #TO GO FORWARD, +VE X VALUES
-
         self.setpoints = [
-            (0.0, 0.0, -1.5, 0.0), 
-            (1.5, 0.0, -1.5, 0.0), 
-            (self.aruco_x, -self.aruco_y, -1.5, 0.0)
+            (self.home_x, self.home_y, -1.25, 0.0), 
+            (1.0, 0.0, -1.25, 0.0),
+            (self.home_x, self.home_y, -1.25, 0.0)
         ]
         
         timer_period = 0.02  # seconds
@@ -87,12 +80,25 @@ class OffboardControl(Node):
         # print("  - offboard status: ", VehicleStatus.NAVIGATION_STATE_OFFBOARD)
 
 
+    #PX4 quaternions are in Hamilton Convention (w,x,y,z)
     def odom_callback(self, msg):
         self.curr_x = msg.x
         self.curr_y = msg.y
         self.curr_z = msg.z
-        self.curr_q = msg.q
+
+        #Convert Hamilton Conv. to JPL Conv.
+        px4_q = [float(msg.q[1]), float(msg.q[2]), float(msg.q[3]), float(msg.q[0])]
+        euler = euler_from_quaternion(px4_q)
+        self.curr_yaw = euler[2]
         #print(self.curr_z)
+
+    def setHome(self):
+        if self.homeSet == False:
+            self.home_x = self.curr_x
+            self.home_y = self.curr_y
+            self.home_z = self.curr_z
+            self.home_yaw = self.curr_yaw
+            self.homeSet = True
     
     
     def arm(self):
@@ -123,6 +129,8 @@ class OffboardControl(Node):
         msg = VehicleCommand()
         msg.timestamp = self.timestamp
         msg.param1 = float(param1)
+
+
         msg.param2 = float(param2)
         msg.command = command
         msg.target_system = 1
@@ -167,15 +175,21 @@ class OffboardControl(Node):
             
         if self.offboard_counter < 11:
             self.offboard_counter += 1
+            self.setHome()
 
         if self.nav_state == VehicleStatus.NAVIGATION_STATE_OFFBOARD:
             #Takeoff
             self.trajectory_setpoint_publisher(self.setpoints, self.current_setpoint_index)
 
-            if -1.55 < self.curr_z < -1.4:
-                # self.current_setpoint_index = 1
-                # self.trajectory_setpoint_publisher(self.setpoints, self.current_setpoint_index)
-                self.land()
+            if -1.3 < self.curr_z < -1.2:
+                self.current_setpoint_index = 1
+                self.trajectory_setpoint_publisher(self.setpoints, self.current_setpoint_index)
+                #self.land()
+
+            if -1.3 < self.curr_z < -1.2 and 0.9 < self.curr_x < 1.1 :
+                self.current_setpoint_index = 2
+                self.trajectory_setpoint_publisher(self.setpoints, self.current_setpoint_index)
+                #self.land()
 
             # if 0.9 < self.curr_x <= 1.0 and (-1.55 < self.curr_z < -1.4):
             #     self.land()
