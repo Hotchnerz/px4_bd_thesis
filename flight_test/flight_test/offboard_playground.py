@@ -57,7 +57,7 @@ class OffboardControl(Node):
         self.nav_state = VehicleStatus.NAVIGATION_STATE_MAX
         # self.arucoID = 0
         # self.posCounter = 0
-        # self.takeoff = False
+        self.takeoff = False
         # self.arucoFound = False
         # self.FirstStage = False
         # self.SecondStage = False
@@ -68,9 +68,15 @@ class OffboardControl(Node):
 
         self.setpoints = [
             (0.0, 0.0, -1.25, 0.0), 
-            (1.5, 0.0, -1.25, 0.0), 
-            (self.aruco_x, self.aruco_y, -1.25, 0.0)
+            (1.5, 0.0, -1.25, 0.0),
+            (1.5, 1.5, -1.25, 0.0)
         ]
+
+        # self.setpoints = [
+        #     (0.0, 0.0, -1.25, 0.0), 
+        #     (1.5, 0.0, -1.25, 0.0), 
+        #     (self.aruco_x, self.aruco_y, -1.25, 0.0)
+        # ]
         
         timer_period = 0.02  # seconds
         self.timer = self.create_timer(timer_period, self.cmdloop_callback)
@@ -145,7 +151,14 @@ class OffboardControl(Node):
 
         return setpointReached
         
-    # def validateAruco(self):
+    def checkAruco(self):
+        arucoFound = False
+
+        if self.arucoID == 122:
+            arucoFound = True
+            #arucoSetpoint = (self.aruco_x, self.aruco_y, self.aruco_z*-1)
+
+        return arucoFound
 
     
     
@@ -221,7 +234,7 @@ class OffboardControl(Node):
         self.publish_offboard_heartbeat()
         self.exec_time = time.time() - self.start_time
 
-        if self.offboard_counter == 10:
+        if self.offboard_counter == 10 and self.nav_state != VehicleStatus.NAVIGATION_STATE_OFFBOARD:
             self.arm()
             self.offboard_activate()
         elif self.offboard_counter < 11:
@@ -230,19 +243,42 @@ class OffboardControl(Node):
         if self.nav_state == VehicleStatus.NAVIGATION_STATE_OFFBOARD:
             #Go to Takeoff
             self.trajectory_setpoint_publisher(self.setpoints, self.current_setpoint_index)
+
             
             if self.setpointChecker() == True and self.current_setpoint_index == 0:
-                self.get_logger().info('Sending Next Setpoint')
+                # self.get_logger().info('Sending Next Setpoint')
                 self.current_setpoint_index = 1
 
-                self.trajectory_setpoint_publisher(self.setpoints, self.current_setpoint_index)
+                # self.trajectory_setpoint_publisher(self.setpoints, self.current_setpoint_index)
 
             #Find Aruco
             if self.setpointChecker() == True and self.current_setpoint_index == 1:
                 # self.get_logger().info('Prepare to Land')
                 # self.land()
-                self.get_logger().info('Find Aruco...')
+                # self.get_logger().info('Find Aruco...')
                 #Call aruco detect function
+                arucoFlag = self.checkAruco()
+                print(self.checkAruco())
+                if arucoFlag == True:
+                    #arucoSetpoint = (self.aruco_x, self.aruco_y, self.aruco_z*-1, 0.0)
+                    # self.get_logger().info('Found Aruco')
+                    self.current_setpoint_index = 2
+                    # self.trajectory_setpoint_publisher(self.setpoints, self.current_setpoint_index)
+
+                    if self.setpointChecker() == True:
+                        self.land()
+
+                else:
+                    print("Lost Aruco")
+                    # self.get_logger().info('Lost Aruco')
+
+        if self.exec_time >= 30 and self.checkAruco() == False:
+            self.current_setpoint_index = 0
+            # self.trajectory_setpoint_publisher(self.setpoints, self.current_setpoint_index)
+            if self.setpointChecker() == True:
+                self.land()
+
+
                 #If Aruco is found, sit on top of it and wait.
                 #Then take 10 samples, descend until you land.
 
