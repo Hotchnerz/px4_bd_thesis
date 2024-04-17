@@ -2,13 +2,14 @@ import rclpy
 import numpy as np
 import time
 import tf2_ros
+import threading
 from geometry_msgs.msg import Pose
 from rclpy.node import Node
 from rclpy.clock import Clock
 from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy, QoSDurabilityPolicy
 
 from tf_transformations import euler_from_quaternion
-from px4_msgs.msg import OffboardControlMode, TrajectorySetpoint, VehicleStatus, VehicleCommand, Timesync, VehicleOdometry
+from px4_msgs.msg import OffboardControlMode, TrajectorySetpoint, VehicleStatus, VehicleCommand, Timesync, VehicleOdometry, VehicleLocalPosition, VehicleLocalPositionSetpoint
 from ros2_aruco_interfaces.msg import ArucoMarkers
 
 class OffboardControl(Node):
@@ -21,9 +22,11 @@ class OffboardControl(Node):
             history=QoSHistoryPolicy.RMW_QOS_POLICY_HISTORY_KEEP_LAST,
             depth=1
         )
+        self.looprate = self.create_rate(10, self.get_clock())
         
         #Publishers
         self.trajectory_pub = self.create_publisher(TrajectorySetpoint, '/fmu/trajectory_setpoint/in', qos_profile)
+        self.localpos_pub = self.create_publisher(VehicleLocalPositionSetpoint, '/fmu/vehicle_local_position_setpoint/in', qos_profile)
         self.offboard_control_mode_pub = self.create_publisher(OffboardControlMode, 'fmu/offboard_control_mode/in', qos_profile)
         self.vehicle_cmd_pub = self.create_publisher(VehicleCommand, '/fmu/vehicle_command/in', qos_profile)
 
@@ -31,12 +34,14 @@ class OffboardControl(Node):
         #Subscribers
         self.drone_status_sub = self.create_subscription(VehicleStatus, '/fmu/vehicle_status/out', self.vehicle_status_callback, qos_profile)
         self.timesync_subscriber = self.create_subscription(Timesync, '/fmu/timesync/out', self.timesync_callback, qos_profile)
-        self.odom_subscriber = self.create_subscription(VehicleOdometry, '/fmu/vehicle_odometry/out', self.odom_callback, qos_profile)
+        # self.odom_subscriber = self.create_subscription(VehicleOdometry, '/fmu/vehicle_odometry/out', self.odom_callback, qos_profile)
+        self.odom_subscriber = self.create_subscription(VehicleLocalPosition, '/fmu/vehicle_local_position/out', self.odom_callback, qos_profile)
         self.aruco_subscriber = self.create_subscription(ArucoMarkers, '/aruco_markers', self.aruco_callback, 10)
         self.aruco_baselink_subscriber = self.create_subscription(Pose, '/aruco_baselink', self.aruco_baselink_callback, qos_profile)
 
 
         self.curr_x, self.curr_y, self.curr_z, self.curr_yaw = 0.0, 0.0, 0.0, 0.0
+        self.curr_vx, self.curr_vy, self.curr_vz = 0.0, 0.0, 0.0, 0.0
         # self.home_x, self.home_y, self.home_z, self.home_yaw = 0.0, 0.0, 0.0, 0.0
         self.aruco_x, self.aruco_y, self.aruco_z = 0.0, 0.0, 0.0
         # self.aruco_qx, self.aruco_qy, self.aruco_qz, self.aruco_qw = 0.0, 0.0, 0.0, 0.0
@@ -80,7 +85,7 @@ class OffboardControl(Node):
         
         timer_period = 0.02  # seconds
         self.timer = self.create_timer(timer_period, self.cmdloop_callback)
- 
+
     def vehicle_status_callback(self, msg):
         #TODO: handle NED->ENU transformation
         self.nav_state = msg.nav_state
@@ -93,10 +98,19 @@ class OffboardControl(Node):
         self.curr_y = msg.y
         self.curr_z = msg.z
 
-        #Convert Hamilton Conv. to JPL Conv.
-        px4_q = [float(msg.q[1]), float(msg.q[2]), float(msg.q[3]), float(msg.q[0])]
-        euler = euler_from_quaternion(px4_q)
-        self.curr_yaw = euler[2]
+
+
+        # #Convert Hamilton Conv. to JPL Conv.
+        # px4_q = [float(msg.q[1]), float(msg.q[2]), float(msg.q[3]), float(msg.q[0])]
+        # euler = euler_from_quaternion(px4_q)
+        # self.curr_yaw = euler[2]
+
+        if self.setpointChecker() == True:
+            self.current_setpoint_index += 1
+        
+        if self.current_setpoint_index > len(self.setpoints):
+            self.land()
+
         #print(self.curr_z)
 
     def setHome(self):
@@ -145,7 +159,8 @@ class OffboardControl(Node):
         #     setpointReached = True
         
         if (sp2Validiate[0] - 0.05 < self.curr_x < sp2Validiate[0] + 0.05) and (sp2Validiate[1] - 0.05 < self.curr_y < sp2Validiate[1] + 0.05) and (sp2Validiate[2] + 0.05 > self.curr_z > sp2Validiate[2] - 0.05):
-            setpointReached = True
+            if self.curr_vx == 0 and  self.curr_vy == 0 and  self.curr_vz == 0:
+                setpointReached = True
 
         #Stil need one for orientation
 
@@ -157,8 +172,8 @@ class OffboardControl(Node):
         if self.arucoID == 122:
             arucoFound = True
             #arucoSetpoint = (self.aruco_x, self.aruco_y, self.aruco_z*-1)
-
-        return arucoFound
+        else:
+            return arucoFound
 
     
     
@@ -227,12 +242,22 @@ class OffboardControl(Node):
         msg.x, msg.y, msg.z, msg.yaw = setpoint[index]
         self.trajectory_pub.publish(msg)
 
+    def localpos_setpoint_publisher(self, setpoint, index):
+        msg = VehicleLocalPositionSetpoint()
+        msg.timestamp = self.timestamp
+        msg.x, msg.y, msg.z, msg.yaw = setpoint[index]
+        self.localpos_pub.publish(msg)
+
+
 
 
     def cmdloop_callback(self):
-        # Publish offboard control modes
+        # # Publish offboard control modes
         self.publish_offboard_heartbeat()
-        self.exec_time = time.time() - self.start_time
+        self.trajectory_setpoint_publisher(self.setpoints, self.current_setpoint_index)
+        # self.exec_time = time.time() - self.start_time
+
+
 
         if self.offboard_counter == 10 and self.nav_state != VehicleStatus.NAVIGATION_STATE_OFFBOARD:
             self.arm()
@@ -240,44 +265,44 @@ class OffboardControl(Node):
         elif self.offboard_counter < 11:
             self.offboard_counter += 1
 
-        if self.nav_state == VehicleStatus.NAVIGATION_STATE_OFFBOARD:
+        
+
+        # if self.nav_state == VehicleStatus.NAVIGATION_STATE_OFFBOARD:
             #Go to Takeoff
-            self.trajectory_setpoint_publisher(self.setpoints, self.current_setpoint_index)
-
-            
-            if self.setpointChecker() == True and self.current_setpoint_index == 0:
-                # self.get_logger().info('Sending Next Setpoint')
-                self.current_setpoint_index = 1
-
-                # self.trajectory_setpoint_publisher(self.setpoints, self.current_setpoint_index)
-
-            #Find Aruco
-            if self.setpointChecker() == True and self.current_setpoint_index == 1:
-                # self.get_logger().info('Prepare to Land')
-                # self.land()
-                # self.get_logger().info('Find Aruco...')
-                #Call aruco detect function
-                arucoFlag = self.checkAruco()
-                print(self.checkAruco())
-                if arucoFlag == True:
-                    #arucoSetpoint = (self.aruco_x, self.aruco_y, self.aruco_z*-1, 0.0)
-                    # self.get_logger().info('Found Aruco')
-                    self.current_setpoint_index = 2
-                    # self.trajectory_setpoint_publisher(self.setpoints, self.current_setpoint_index)
-
-                    if self.setpointChecker() == True:
-                        self.land()
-
-                else:
-                    print("Lost Aruco")
-                    # self.get_logger().info('Lost Aruco')
-
-        if self.exec_time >= 30 and self.checkAruco() == False:
-            self.current_setpoint_index = 0
             # self.trajectory_setpoint_publisher(self.setpoints, self.current_setpoint_index)
-            if self.setpointChecker() == True:
-                self.land()
+            # print("hte")
 
+
+            # if self.setpointChecker() == True and self.current_setpoint_index == 0:
+            #     # self.get_logger().info('Sending Next Setpoint')
+            #     self.current_setpoint_index = 1
+        
+            # if self.setpointChecker() == True and self.current_setpoint_index == 1:
+            #     # self.get_logger().info('Sending Next Setpoint')
+            #     self.land()
+
+
+        #     #Find Aruco
+        #     if self.setpointChecker() == True and self.current_setpoint_index == 1:
+
+        #         #Call aruco detect function
+        #         arucoFlag = self.checkAruco()
+        #         print(self.checkAruco())
+        #         if arucoFlag == True:
+
+        #             self.current_setpoint_index = 2
+
+        #             if self.setpointChecker() == True:
+        #                 self.land()
+
+        #         else:
+        #             print("Lost Aruco")
+        #             # self.get_logger().info('Lost Aruco')
+
+        # if self.exec_time >= 30 and self.checkAruco() == False:
+        #     self.current_setpoint_index = 0
+        #     if self.setpointChecker() == True:
+        #         self.land()
 
                 #If Aruco is found, sit on top of it and wait.
                 #Then take 10 samples, descend until you land.
@@ -285,6 +310,24 @@ class OffboardControl(Node):
 
             #What happens if you lose the aruco?
                 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
