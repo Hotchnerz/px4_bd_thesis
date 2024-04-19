@@ -5,7 +5,7 @@ from rclpy.node import Node
 from tf2_ros import TransformBroadcaster
 from tf_transformations import quaternion_from_euler, quaternion_multiply
 import tf_transformations
-from px4_msgs.msg import VehicleOdometry
+from px4_msgs.msg import VehicleOdometry, VehicleAttitude, VehicleLocalPosition
 from geometry_msgs.msg import TransformStamped
 
 class MapFramePublisher(Node):
@@ -17,10 +17,21 @@ class MapFramePublisher(Node):
         self.tf_broadcaster = TransformBroadcaster(self)
 
         #Subscriber
-        self.subscription = self.create_subscription(VehicleOdometry, 'fmu/vehicle_odometry/out', self.odom_callback, 10)
-        self.subscription  # prevent unused variable warning
+        self.vehicleAttitude_subscription = self.create_subscription(VehicleAttitude, 'fmu/vehicle_attitude/out', self.vehicleAttiude_callback, 10)
+        self.vehicleLocalPosition_subscription = self.create_subscription(VehicleLocalPosition, 'fmu/vehicle_local_position/out', self.vehicleLocalPosiiton_callback, 10)
+        #self.subscription = self.create_subscription(VehicleOdometry, 'fmu/vehicle_odometry/out', self.odom_callback, 10)
+        #self.subscription  # prevent unused variable warning
+        self.vehicleAttitude_subscription  # prevent unused variable warning
+        self.vehicleLocalPosition_subscription  # prevent unused variable warning
 
-    def odom_callback(self, msg):
+        self.q = [0, 0, 0, 0]
+
+    def vehicleAttiude_callback(self, msg):
+        self.q = msg.q
+
+
+
+    def vehicleLocalPosiiton_callback(self, msg):
         
         #ENU is ROS Frame Convention
         #NED is PX4 Frame Convention
@@ -28,9 +39,16 @@ class MapFramePublisher(Node):
 
         #Is quaternion from VehicleOdometry message x,y,z,w??
 
-        enu_q = [float(msg.q[0]), float(msg.q[1]), float(msg.q[2]), float(msg.q[3])]
+        #enu_q = [float(msg.q[0]), float(msg.q[1]), float(msg.q[2]), float(msg.q[3])]
         #REARRANGE Quaternion from PX4 from w, x, y, z to x, y, z, w
-        correct_q = [float(msg.q[1]), float(msg.q[2]), float(msg.q[3]), float(msg.q[0])]
+        #correct_q = [float(msg.q[1]), float(msg.q[2]), float(msg.q[3]), float(msg.q[0])]
+        #WHY DOES THIS GO OUT OF INDEX RANGE?
+        correct_q = [self.q[1], self.q[2], self.q[3], self.q[0]]
+        #correct_q = [self.q[1], self.q[2], self.q[-1], self.q[0]]
+
+        print(self.q)
+        print(correct_q)
+        
         #enu_euler = tf_transformations.euler_from_quaternion(correct_q)
         # print(msg.q)
         # print(correct_q)
@@ -57,9 +75,9 @@ class MapFramePublisher(Node):
         # print(T_px4)
         # print(map_frame)
 
-        print(map_frame)
-        print(map_trans)
-        print(map_rot)
+        # print(map_frame)
+        # print(map_trans)
+        # print(map_rot)
         
         t = TransformStamped()
         # px4_rot= tf_transformations.euler_matrix(enu_euler[0], enu_euler[1], enu_euler[2])
@@ -79,34 +97,6 @@ class MapFramePublisher(Node):
         t.transform.rotation.y = map_rot[1] 
         t.transform.rotation.z = map_rot[2]
         t.transform.rotation.w = map_rot[3]
-
-        # t.transform.translation.x = msg.x
-        # t.transform.translation.y = msg.y
-        # #t.transform.translation.z = (msg.z - 0.184)*-1
-        # t.transform.translation.z = msg.z
-        # #Height of drone from base_link is 0.21528
-
-        # t.transform.rotation.x = float(msg.q[1])
-        # t.transform.rotation.y = float(msg.q[2])
-        # t.transform.rotation.z = float(msg.q[3])
-        # t.transform.rotation.w = float(msg.q[0])
-
-        # print(T_px4)
-        # print(map_frame)
-
-        # #Aruco markers msg stores geometry/msgs poses messages in an array called poses.
-        # #Take this pose information and broadcast as a transform.
-        # t.transform.translation.x = msg.x
-        # t.transform.translation.y = msg.y*-1
-        # #t.transform.translation.z = (msg.z - 0.184)*-1
-        # t.transform.translation.z = (msg.z)*-1
-        # #Height of drone from base_link is 0.21528
-
-        # t.transform.rotation.x = q_rotate[0]
-        # t.transform.rotation.y = q_rotate[1]
-        # t.transform.rotation.z = q_rotate[2]
-        # t.transform.rotation.w = q_rotate[3]2
-
 
         # Send the transformation
         self.tf_broadcaster.sendTransform(t)

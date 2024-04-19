@@ -66,6 +66,7 @@ class OffboardControl(Node):
 
         self.setpoints = [
             (self.home_x, self.home_y, -1.25, 0.0), 
+            (self.home_x, self.home_y, -1.25, 1.5708), 
             (1.0, 0.0, -1.25, 0.0),
             (self.home_x, self.home_y, -1.25, 0.0)
         ]
