@@ -81,7 +81,40 @@ class OffboardControl(Node):
         ]
         
         timer_period = 0.02  # seconds
-        self.timer = self.create_timer(timer_period, self.cmdloop_callback)
+        self.timer_offboard = self.create_timer(timer_period, self.offboard_callback)
+
+        timer_periodA = 0.1  # seconds
+        self.timerA = self.create_timer(timer_period, self.cmdloop_callback)
+
+        self.states = {
+            "IDLE": self.state_init,
+            "ARMING": self.arm,
+            "TAKEOFF": self.takeoff,
+            "LOITER": self.loiter,
+            "OFFBOARD": self.offboard,
+            "ARUCO_SEARCH":self.search,
+            "PRECISION_LAND": self.land
+        }
+        self.current_state = "IDLE"
+        self.last_state = self.current_state
+
+    def takeoff(self):
+        pass
+
+    def state_init(self):
+        pass
+
+    def loiter(self):
+        pass
+
+    def offboard(self):
+        pass
+
+    def search(self):
+        pass
+
+    def land(self):
+        pass
  
     def vehicle_status_callback(self, msg):
         self.nav_state = msg.nav_state
@@ -122,18 +155,6 @@ class OffboardControl(Node):
     def aruco_callback(self, msg):
         self.arucoID = msg.marker_ids[0]
         print(self.arucoID)
-
-        #self.aruco_q = [self.aruco_qx, self.aruco_qy, self.aruco_qz, self.aruco_qw]
-        #self.aruco_roll, self.aruco_pitch, self.aruco_yaw = euler_from_quaternion(self.aruco_q)
-
-        # aruco_cl_pose = msg.poses[0]
-
-        # self.aruco_q = [self.aruco_qx, self.aruco_qy, self.aruco_qz, self.aruco_qw]
-        # self.aruco_roll, self.aruco_pitch, self.aruco_yaw = euler_from_quaternion(self.aruco_q)
-
-        
-        # print("Aruco y: ", self.aruco_y)
-        # print(self.aruco_yaw)
     
     def aruco_baselink_callback(self, msg):
         self.aruco_x = msg.position.x
@@ -187,6 +208,7 @@ class OffboardControl(Node):
         rclpy.shutdown()
     
 
+    #This function needs to be customized. I can't use this because I loose control of drone position if I used PX4 Landing System
     def land(self):
         self.publish_vehicle_command(VehicleCommand.VEHICLE_CMD_NAV_LAND)
         self.get_logger().info('Landing initiated')
@@ -241,20 +263,22 @@ class OffboardControl(Node):
         self.localpos_pub.publish(msg)
 
 
-
-    def cmdloop_callback(self):
-        # Publish offboard control modes
+    def offboard_callback(self):
         self.publish_offboard_heartbeat()
         self.trajectory_setpoint_publisher(self.setpoints, self.current_setpoint_index)
-        #self.localpos_setpoint_publisher(self.setpoints)
+
+        if self.offboard_counter < 11:
+            self.offboard_counter += 1
+
+
+    def cmdloop_callback(self):
+        print("Hello")
         self.exec_time = time.time() - self.start_time
 
         if self.offboard_counter == 10:
             self.arm()
             self.offboard_activate()
             
-        if self.offboard_counter < 11:
-            self.offboard_counter += 1
 
         if self.nav_state == VehicleStatus.NAVIGATION_STATE_OFFBOARD:
             #Go to Takeoff
@@ -265,6 +289,7 @@ class OffboardControl(Node):
             print(self.setpointChecker())
             # if self.setpointChecker == True and self.current_setpoint_index == 0:
             #     self.localpos_setpoint_publisher(self.setpoints)
+    
             
                 
 

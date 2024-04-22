@@ -24,7 +24,7 @@ class MapFramePublisher(Node):
         self.vehicleAttitude_subscription  # prevent unused variable warning
         self.vehicleLocalPosition_subscription  # prevent unused variable warning
 
-        self.q = [0, 0, 0, 0]
+        self.q = [1, 0, 0, 0]
 
     def vehicleAttiude_callback(self, msg):
         self.q = msg.q
@@ -46,8 +46,8 @@ class MapFramePublisher(Node):
         correct_q = [self.q[1], self.q[2], self.q[3], self.q[0]]
         #correct_q = [self.q[1], self.q[2], self.q[-1], self.q[0]]
 
-        print(self.q)
-        print(correct_q)
+        # print(self.q)
+        # print(correct_q)
         
         #enu_euler = tf_transformations.euler_from_quaternion(correct_q)
         # print(msg.q)
