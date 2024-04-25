@@ -1,0 +1,6 @@
+/aruco_node:
+  ros__parameters:
+    marker_size: 0.110
+    aruco_dictionary_id: DICT_5X5_250
+    image_topic: /c920_sensor/image_raw
+    camera_info_topic: /c920_sensor/camera_info
