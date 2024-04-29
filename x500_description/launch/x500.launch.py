@@ -36,7 +36,7 @@ def generate_launch_description():
         description='Whether to start the joint state publisher')
     declare_use_rviz_cmd = DeclareLaunchArgument(
         'use_rviz',
-        default_value='False',
+        default_value='True',
         description='Whether to start RVIZ')
     declare_urdf_cmd = DeclareLaunchArgument(
         'urdf_file',
