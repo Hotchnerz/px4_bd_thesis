@@ -8,7 +8,7 @@ from tf_transformations import euler_from_quaternion
 from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy, QoSDurabilityPolicy
 import time
 
-from px4_msgs.msg import OffboardControlMode, TrajectorySetpoint, VehicleStatus, VehicleCommand, Timesync, VehicleOdometry, VehicleLocalPosition, VehicleLocalPositionSetpoint, LandingTargetPose
+from px4_msgs.msg import OffboardControlMode, TrajectorySetpoint, VehicleStatus, VehicleCommand, Timesync, VehicleOdometry, VehicleLocalPosition, VehicleLocalPositionSetpoint, LandingTargetPose, VehicleAttitude
 from ros2_aruco_interfaces.msg import ArucoMarkers
 
 class OffboardControl(Node):
@@ -34,6 +34,7 @@ class OffboardControl(Node):
         self.drone_status_sub = self.create_subscription(VehicleStatus, '/fmu/vehicle_status/out', self.vehicle_status_callback, qos_profile)
         #self.timesync_subscriber = self.create_subscription(Timesync, '/fmu/timesync/out', self.timesync_callback, qos_profile)
         self.localpos_subscriber = self.create_subscription(VehicleLocalPosition, '/fmu/vehicle_local_position/out', self.localpos_callback, qos_profile)
+        self.vehicle_att_subscriber = self.create_subscription(VehicleAttitude, '/fmu/vehicle_attitude/out', self.vehicle_att_callback, qos_profile)
         #self.odom_subscriber = self.create_subscription(VehicleOdometry, '/fmu/vehicle_odometry/out', self.odom_callback, qos_profile)
         self.aruco_subscriber = self.create_subscription(ArucoMarkers, '/aruco_markers', self.aruco_callback, 10)
         self.aruco_baselink_subscriber = self.create_subscription(Pose, '/aruco_baselink', self.aruco_baselink_callback, qos_profile)
@@ -44,6 +45,8 @@ class OffboardControl(Node):
         self.curr_ax, self.curr_ay, self.curr_az = 0.0, 0.0, 0.0
         self.aruco_x, self.aruco_y, self.aruco_z = 1.5, 1.5, 1.5
         self.home_x, self.home_y, self.home_z, self.home_yaw = 0.0, 0.0, 0.0, 0.0
+        self.homeSetPos = False
+        self.homeSetYaw = False
         self.timestamp = 0
         self.offboard_counter = 0
         self.current_setpoint_index = 0
@@ -57,10 +60,12 @@ class OffboardControl(Node):
         self.start_time = time.time()
         self.exec_time = 0
 
-        self.setpoints = [
-            (0.0, 0.0, -1.25, 0.0), 
-            (1.5, 0.0, -1.25, 0.0),
-        ]
+        # self.setpoints = [
+        #     [self.home_x, self.home_y, self.home_z + -1.25, self.home_yaw], 
+        #     [self.home_x + 1.5, self.home_y, self.home_z + -1.25, self.home_yaw]
+        # ]
+
+        self.setpoints = [(0.0, 0.0, 0.0, 0.0)]
 
         self.idle = self.idle
         self.arm = self.arm
@@ -140,14 +145,35 @@ class OffboardControl(Node):
 
         self.timestamp = msg.timestamp
 
-
-    def setHome(self):
-        if self.homeSet == False:
+        if self.homeSetPos == False:
             self.home_x = self.curr_x
             self.home_y = self.curr_y
             self.home_z = self.curr_z
+
+            self.homeSetPos = True
+    
+    def vehicle_att_callback(self, msg):
+        q = [msg.q[1], msg.q[2], msg.q[3], msg.q[0]]
+
+        rpy = euler_from_quaternion(q)
+
+        self.curr_yaw = rpy[2]
+        if self.homeSetYaw == False:
             self.home_yaw = self.curr_yaw
-            self.homeSet = True
+            self.homeSetYaw = True
+
+
+
+
+
+    # def setHome(self):
+    #     if self.homeSet == False and self.offboard_counter < 11:
+    #         self.home_x = self.curr_x
+    #         self.home_y = self.curr_y
+    #         self.home_z = self.curr_z
+    #         self.home_yaw = self.curr_yaw
+    #         self.homeSet = True
+    #     print(self.home_x)
     
     def aruco_callback(self, msg):
         self.arucoID = int(msg.marker_ids[0])
@@ -308,6 +334,7 @@ class OffboardControl(Node):
 
     #Where I want state changes to occur
     def cmdloop_callback(self):
+        #self.setHome()
         #self.drone_state(self.current_state)
         #self.exec_time = time.time() - self.start_time
 
@@ -315,6 +342,9 @@ class OffboardControl(Node):
         if self.arm_state != VehicleStatus.ARMING_STATE_ARMED and self.armFlag == False:
             self.arm()
             self.armFlag = True
+            self.setpoints.clear()
+            self.setpoints.append((self.home_x, self.home_y, self.home_z + (-1.25), self.home_yaw))
+            self.setpoints.append((self.home_x + (1.5), self.home_y, self.home_z + (-1.25), self.home_yaw))
             print(self.nav_state)
             print("ARM")
 
