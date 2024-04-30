@@ -23,10 +23,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'offboard = flight_test.offboard_predep:main',
             'offboard_cali = flight_test.offboard_testflight:main',
-            'old_offboard = flight_test.old_offboard:main',
-            'offboard_perch = flight_test.offboard_perch:main',
             'control = flight_test.control:main',
             'offboard_playground = flight_test.offboard_playground:main'
         ],
