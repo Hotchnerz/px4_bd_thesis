@@ -18,14 +18,14 @@ def generate_launch_description():
     gazebo_aruco_node = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             os.path.join(get_package_share_directory('ros2_aruco'),
-                         'launch/aruco_recognition.launch.py')
+                         'launch/aruco_recognition_launch.py')
         )
     )
 
     drone_urdf_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             os.path.join(get_package_share_directory('x500_description'),
-                            'launch/x500.launch.py')
+                            'launch/x500_launch.py')
         )
     )
 
