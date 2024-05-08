@@ -44,7 +44,7 @@ namespace formats
 class UYVY : public pixel_format_base
 {
 public:
-  UYVY()
+  explicit UYVY(const format_arguments_t & args = format_arguments_t())
   : pixel_format_base(
       "uyvy",
       V4L2_PIX_FMT_UYVY,
@@ -52,22 +52,24 @@ public:
       2,
       8,
       false)
-  {}
+  {
+    (void)args;
+  }
 };
 
 
 class UYVY2RGB : public pixel_format_base
 {
 public:
-  explicit UYVY2RGB(const int & number_of_pixels)
+  explicit UYVY2RGB(const format_arguments_t & args = format_arguments_t())
   : pixel_format_base(
       "uyvy2rgb",
       V4L2_PIX_FMT_UYVY,
       usb_cam::constants::RGB8,
-      2,
+      3,
       8,
       true),
-    m_number_of_pixels(number_of_pixels)
+    m_number_of_pixels(args.pixels)
   {}
 
   /// @brief In this format each four bytes is two pixels.
@@ -78,13 +80,15 @@ public:
   ///
   /// Source: https://www.linuxtv.org/downloads/v4l-dvb-apis-old/V4L2-PIX-FMT-YUYV.html
   ///
+  // Use `INDENT-OFF` here to disable uncrustify for this function due to
+  // differing uncrustify formats for different distros
+  // *INDENT-OFF*
   void convert(const char * & src, char * & dest, const int & bytes_used) override
   {
     (void)bytes_used;    // not used by this conversion method
     int i, j;
     unsigned char y0, y1, u, v;
     unsigned char r, g, b;
-
     for (i = 0, j = 0; i < (static_cast<int>(m_number_of_pixels) << 1); i += 4, j += 6) {
       u = (unsigned char)src[i + 0];
       y0 = (unsigned char)src[i + 1];
@@ -100,6 +104,7 @@ public:
       dest[j + 5] = b;
     }
   }
+  // *INDENT-ON*
 
 private:
   size_t m_number_of_pixels;

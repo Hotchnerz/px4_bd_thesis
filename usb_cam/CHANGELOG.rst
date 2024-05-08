@@ -2,10 +2,122 @@
 Changelog for package usb_cam
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+0.8.1 (2024-05-01)
+------------------
+* Merge pull request `#330 <https://github.com/ros-drivers/usb_cam/issues/330>`_ from ros-drivers/fix-rolling-builds
+  Update comment in CI from Jammy to Noble
+* Fix linter error in uyvy file
+  - Update comment in CI from Jammy to Noble
+* Merge pull request `#324 <https://github.com/ros-drivers/usb_cam/issues/324>`_ from clalancette/clalancette/const-avcodec
+  Switch to a const AVCodec *.
+* Switch to a const AVCodec *.
+  This is because newer versions of avcodec return a const AVCodec *.
+* Merge pull request `#313 <https://github.com/ros-drivers/usb_cam/issues/313>`_ from ros-drivers/v4l2-devices-might-not-be-named-video
+  V4l2 devices might not be named video
+* Use /sys/class/video4linux/ to get list of v4l2 devices
+* Merge pull request `#311 <https://github.com/ros-drivers/usb_cam/issues/311>`_ from firesurfer/ros2
+  Resolve Symlinks
+* Update usb_cam_node.cpp
+  Fix formatting
+* try to fix formatting issue
+* resolve symlinks
+* Merge pull request `#305 <https://github.com/ros-drivers/usb_cam/issues/305>`_ from ros-drivers/fix-docs-deployment
+* Remove unnecessary steps from docs CI
+* Merge pull request `#304 <https://github.com/ros-drivers/usb_cam/issues/304>`_ from ros-drivers/fix-docs-ci
+  Fix docs ci
+* Trigger docs CI on every push to ros2 branch
+* Merge pull request `#303 <https://github.com/ros-drivers/usb_cam/issues/303>`_ from ros-drivers/add-mkdocs-documentation
+* Standup basic mkdocs documentation site
+* Contributors: Chris Lalancette, Evan Flynn, Lennart Nachtigall
+
+0.8.0 (2023-12-04)
+------------------
+* Bump for release 0.8.0, update docs
+* Merge pull request `#300 <https://github.com/ros-drivers/usb_cam/issues/300>`_ from ros-drivers/263-check-if-specified-pixel-format-is-supported
+  263 check if specified pixel format is supported
+* Check if specified pixel format is supported by driver and by device
+  - Also fix typo in params_2 yaml file
+  - fix linter errors too
+* Add v4l2_str method to pixel_format_base class
+* Add common arguments strut to pixel format classes
+  - Use common arguments struct in all format classes
+* Merge pull request `#292 <https://github.com/ros-drivers/usb_cam/issues/292>`_ from ros-drivers/288-fix-uyvy2rgb-size
+  288 fix uyvy2rgb size
+* Merge pull request `#270 <https://github.com/ros-drivers/usb_cam/issues/270>`_ from boitumeloruf/raw-mjpeg-stream
+  Publish raw mjpeg stream directly via compressed image topic
+* Introduced funtions get\_..._from_av_format, fixed code style errors
+* Merge branch 'ros2' into raw-mjpeg-stream
+* fixed minor build issues
+* Merge branch 'ros2' into raw-mjpeg-stream
+* Merge branch 'ros2' of https://github.com/boitumeloruf/usb_cam into ros2
+* Merge pull request `#295 <https://github.com/ros-drivers/usb_cam/issues/295>`_ from ros-drivers/run-ci-on-ros2-branch-too
+  Run CI on ros2 branch pushes too
+* Bump checkout action to latest
+* Ensure ROS_VERSION is set for ROS build farms
+* Run CI on ros2 branch pushes too
+* Merge pull request `#294 <https://github.com/ros-drivers/usb_cam/issues/294>`_ from ros-drivers/291-auto-generate-ci-matrix
+  Auto generate ci matrix
+* Continue on error for ROS 1 build and test job
+* Hard-code noetic to actions matrix step until 2025
+* Handle rolling case where two docker images are listed
+* Switch to tagged version of the active_ros_distros script
+* Add basic ROS 1 node, update CMakelists and package.xml
+* Update CI to automatically generate distro matrix
+* Merge pull request `#293 <https://github.com/ros-drivers/usb_cam/issues/293>`_ from ros-drivers/add-mjpeg-device-format-param
+  Add mjpeg device format param
+* fixed cppcheck and uncrustify errors
+* Refactored use of av_device_format
+* Updated example YAML files to av_device_format
+* Added av_device_format parameter
+* Fix bytes per line logic for base image class
+* Fix number of channels for uyvy2rgb format
+* Merge pull request `#286 <https://github.com/ros-drivers/usb_cam/issues/286>`_ from ros-drivers/285-handle-unavailable-device
+  285 handle unavailable device, list available v4l2 devices
+* Fix manual triggering of CI pipelines
+* Check if given v4l2 device exists before opening it
+* fixed cppcheck and uncrustify errors
+* Merge pull request `#282 <https://github.com/ros-drivers/usb_cam/issues/282>`_ from flynneva/ros2-prepare-release
+  Bump to 0.7.0, generate CHANGELOG
+* Merge branch 'ros2' into raw-mjpeg-stream
+* Fix seg fault when unref av_packet using av_codec < 58.133.100
+* Merge branch 'ros2' into raw-mjpeg-stream
+* Refactored use of av_device_format
+* Merge branch 'ros-drivers:ros2' into ros2
+* Added feature to access raw mjpeg stream and publish directly on compressed image topic
+* Updated example YAML files to av_device_format
+* Added av_device_format parameter
+* Contributors: Boitumelo Ruf, Evan Flynn
+
+0.7.0 (2023-08-30)
+------------------
+* Fix mjpeg invalid ptr and mjpeg memory leak
+* Allocate unique avpacket for each frame
+* Fix some minor memorly leaks for mjpeg
+  Relates to `#262 <https://github.com/ros-drivers/usb_cam/issues/262>`_
+* Update docs to new launch file name
+  Closes `#277 <https://github.com/ros-drivers/usb_cam/issues/277>`_
+* Only unref packet in destructor
+  Closes `#274 <https://github.com/ros-drivers/usb_cam/issues/274>`_ `#275 <https://github.com/ros-drivers/usb_cam/issues/275>`_
+* Enable manaul trigger of ROS 2 CI, add Iron, deprecate Foxy
+* Add Iron to CI, remove Foxy
+* Enable manaul trigger of ROS 2 CI
+* Fix memory leaks in mjpeg2rgb conversion
+* Add SANITIZE option to package to help with debugging, document it
+* Fix memory leaks caused by buffer allocation by using smart pointers
+* Fix linter errors
+* Update params2 file for second camera
+* Fixed wrong image timestamp due to missing handling of microseconds in epoch time shift
+* Removed debug output of timestamp
+* Fixed wring image timestamp due to missing handling of microseconds in epoch time shift.
+* Address multiple memory leak issues after ros2 rewrite
+* Remove EOL Galactic distro from CI
+* Address multiple memory leak issues after ros2 rewrite
+* Create CameraConfig class, use it in launch file
+* imports no longer needed.
+* Multiple cameras + compression
+* Remove debug print accidentally added
 * Clean up ROS 2 node, update parameter logic
-* Contributors: Evan Flynn
+* Contributors: Boitumelo Ruf, Brendon Cintas, Evan Flynn
 
 0.6.0 (2023-04-02)
 ------------------

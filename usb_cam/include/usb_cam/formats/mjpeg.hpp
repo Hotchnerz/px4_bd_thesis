@@ -52,6 +52,7 @@ extern "C" {
 #include "usb_cam/usb_cam.hpp"
 #include "usb_cam/formats/pixel_format_base.hpp"
 #include "usb_cam/formats/utils.hpp"
+#include "usb_cam/formats/av_pixel_format_helper.hpp"
 
 
 namespace usb_cam
@@ -59,10 +60,24 @@ namespace usb_cam
 namespace formats
 {
 
+class RAW_MJPEG : public pixel_format_base
+{
+public:
+  explicit RAW_MJPEG(const format_arguments_t & args = format_arguments_t())
+  : pixel_format_base(
+      "raw_mjpeg",
+      V4L2_PIX_FMT_MJPEG,
+      get_ros_pixel_format_from_av_format(args.av_device_format_str),
+      get_channels_from_av_format(args.av_device_format_str),
+      get_bit_depth_from_av_format(args.av_device_format_str),
+      false)
+  {}
+};
+
 class MJPEG2RGB : public pixel_format_base
 {
 public:
-  MJPEG2RGB(const int & width, const int & height)
+  explicit MJPEG2RGB(const format_arguments_t & args = format_arguments_t())
   : pixel_format_base(
       "mjpeg2rgb",
       V4L2_PIX_FMT_MJPEG,
@@ -75,7 +90,6 @@ public:
     m_avframe_device(av_frame_alloc()),
     m_avframe_rgb(av_frame_alloc()),
     m_avoptions(NULL),
-    m_avpacket(av_packet_alloc()),
     m_averror_str(reinterpret_cast<char *>(malloc(AV_ERROR_MAX_STRING_SIZE)))
   {
     if (!m_avcodec) {
@@ -85,23 +99,21 @@ public:
     if (!m_avparser) {
       throw std::runtime_error("Could not find MJPEG parser");
     }
-    if (!m_avpacket) {
-      throw std::runtime_error("Could not allocate AVPacket");
-    }
 
     m_avcodec_context = avcodec_alloc_context3(m_avcodec);
 
-    m_avframe_device->width = width;
-    m_avframe_device->height = height;
+    m_avframe_device->width = args.width;
+    m_avframe_device->height = args.height;
     m_avframe_device->format = AV_PIX_FMT_YUV422P;
+    m_avframe_device->format = formats::get_av_pixel_format_from_string(args.av_device_format_str);
 
-    m_avframe_rgb->width = width;
-    m_avframe_rgb->height = height;
+    m_avframe_rgb->width = args.width;
+    m_avframe_rgb->height = args.height;
     m_avframe_rgb->format = AV_PIX_FMT_RGB24;
 
     m_sws_context = sws_getContext(
-      width, height, (AVPixelFormat)m_avframe_device->format,
-      width, height, AV_PIX_FMT_RGB24, SWS_FAST_BILINEAR,
+      args.width, args.height, (AVPixelFormat)m_avframe_device->format,
+      args.width, args.height, (AVPixelFormat)m_avframe_rgb->format, SWS_FAST_BILINEAR,
       NULL, NULL, NULL);
 
     // Suppress warnings from ffmpeg libraries to avoid spamming the console
@@ -109,8 +121,8 @@ public:
     av_log_set_flags(AV_LOG_SKIP_REPEATED);
     // av_log_set_flags(AV_LOG_PRINT_LEVEL);
 
-    m_avcodec_context->width = width;
-    m_avcodec_context->height = height;
+    m_avcodec_context->width = args.width;
+    m_avcodec_context->height = args.height;
     m_avcodec_context->pix_fmt = (AVPixelFormat)m_avframe_device->format;
     m_avcodec_context->codec_type = AVMEDIA_TYPE_VIDEO;
 
@@ -145,6 +157,12 @@ public:
 
   ~MJPEG2RGB()
   {
+    if (m_averror_str) {
+      free(m_averror_str);
+    }
+    if (m_avoptions) {
+      free(m_avoptions);
+    }
     if (m_avcodec_context) {
       avcodec_close(m_avcodec_context);
       avcodec_free_context(&m_avcodec_context);
@@ -154,10 +172,6 @@ public:
     }
     if (m_avframe_rgb) {
       av_frame_free(&m_avframe_rgb);
-    }
-    if (m_avpacket) {
-      av_packet_unref(m_avpacket);
-      av_packet_free(&m_avpacket);
     }
     if (m_avparser) {
       av_parser_close(m_avparser);
@@ -174,25 +188,20 @@ public:
     // clear the picture
     memset(dest, 0, m_avframe_device_size);
 
-    #if LIBAVCODEC_VERSION_INT < AV_VERSION_INT(58, 133, 100)
-    // deprecated: https://github.com/FFmpeg/FFmpeg/commit/f7db77bd8785d1715d3e7ed7e69bd1cc991f2d07
-    av_init_packet(m_avpacket);
-    #else
-    av_new_packet(m_avpacket, bytes_used);
-    #endif
-
-    av_packet_from_data(
-      m_avpacket,
-      const_cast<uint8_t *>(reinterpret_cast<const uint8_t *>(src)),
-      bytes_used);
+    auto avpacket = av_packet_alloc();
+    av_new_packet(avpacket, bytes_used);
+    memcpy(avpacket->data, src, bytes_used);
 
     // Pass src MJPEG image to decoder
-    m_result = avcodec_send_packet(m_avcodec_context, m_avpacket);
+    m_result = avcodec_send_packet(m_avcodec_context, avpacket);
+
+    av_packet_free(&avpacket);
 
     // If result is not 0, report what went wrong
     if (m_result != 0) {
       std::cerr << "Failed to send AVPacket to decode: ";
       print_av_error_string(m_result);
+      return;
     }
 
     m_result = avcodec_receive_frame(m_avcodec_context, m_avframe_device);
@@ -202,6 +211,7 @@ public:
     } else if (m_result < 0) {
       std::cerr << "Failed to recieve decoded frame from codec: ";
       print_av_error_string(m_result);
+      return;
     }
 
     sws_scale(
@@ -223,13 +233,12 @@ private:
     std::cerr << m_averror_str << std::endl;
   }
 
-  AVCodec * m_avcodec;
+  const AVCodec * m_avcodec;
   AVCodecContext * m_avcodec_context;
   AVCodecParserContext * m_avparser;
   AVFrame * m_avframe_device;
   AVFrame * m_avframe_rgb;
   AVDictionary * m_avoptions;
-  AVPacket * m_avpacket;
   SwsContext * m_sws_context;
   size_t m_avframe_device_size;
   size_t m_avframe_rgb_size;
