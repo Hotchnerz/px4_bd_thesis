@@ -14,21 +14,25 @@ from px4_msgs.msg import OffboardControlMode, TrajectorySetpoint, VehicleStatus,
 from ros2_aruco_interfaces.msg import ArucoMarkers
 
 class DroneState():
-    states=['IDLE', 'ARM', 'TAKEOFF', 'LOITER', 'SEARCH', 'SCAN', 'LAND']
+    #states=['IDLE', 'ARM', 'TAKEOFF', 'LOITER', 'SEARCH', 'SCAN', 'LAND']
 
     def __init__(self):
-
-        self.machine = Machine(model=self, states=DroneState.states, initial= 'IDLE')
+        pass
+        # self.machine = Machine(model=self, states=DroneState.states, initial= 'IDLE')
         
-        # transitions = [
-        #     { 'trigger': 'melt', 'source': 'solid', 'dest': 'liquid', 'prepare': ['heat_up', 'count_attempts'], 'conditions': 'is_really_hot', 'after': 'stats'},
-        # ]
+        # # transitions = [
+        # #     { 'trigger': 'melt', 'source': 'solid', 'dest': 'liquid', 'prepare': ['heat_up', 'count_attempts'], 'conditions': 'is_really_hot', 'after': 'stats'},
+        # # ]
         
-        self.machine.add_transition('trs_takeoff', 'IDLE', 'TAKEOFF', conditions=['test'], before='update_setpoint')
-        self.machine.add_transition('trs_arm', 'IDLE', 'ARM')
+        # self.machine.add_transition('trs_next', 'IDLE', 'TAKEOFF', conditions=['test'], before='update_setpoint')
+        # self.machine.add_transition('trs_next', 'IDLE', 'ARM')
     
     def test(self):
         print(OffboardControl.nav_state)
+        return False
+
+    def arm_check(self):
+        pass
 
     def update_setpoint(self, setpoint):
         set_x = setpoint[0] + OffboardControl.home_pos[0]
@@ -46,10 +50,22 @@ class DroneState():
         if OffboardControl.arm_state == VehicleStatus.ARMING_STATE_ARMED and OffboardControl.nav_state != VehicleStatus.NAVIGATION_STATE_OFFBOARD:
             return True
 
+    # def setpointChecker(self):
+    #     #Check odom if x500 has reached the setpoint
+    #     setpointReached = False
+    #     sp2Validiate = self.setpoints
+    #     sp2ValidiateAruco = self.aruco_setpoint
+
+    #     if (sp2Validiate[0] - 0.05 < self.curr_x < sp2Validiate[0] + 0.05) and (sp2Validiate[1] - 0.05 < self.curr_y < sp2Validiate[1] + 0.05) and (sp2Validiate[2] + 0.05 > self.curr_z > sp2Validiate[2] - 0.05):
+    #         if (-0.08 < self.curr_vx < 0.08) and  (-0.08 < self.curr_vy < 0.08) and  (0.08 > self.curr_vz > -0.08):
+    #             setpointReached = True
+            #return setpointReached
+
+
 class OffboardControl(Node):
 
     nav_state = VehicleStatus.NAVIGATION_STATE_MAX
-    arm_state = VehicleStatus.ARMING_STATE_MAX
+    #arm_state = VehicleStatus.ARMING_STATE_MAX
     setpoints = [0.0, 0.0, 0.0, 0.0]
     home_pos = [0.0, 0.0, 0.0, 0.0]
 
@@ -96,7 +112,7 @@ class OffboardControl(Node):
         self.offboard_counter = 0
         # self.current_setpoint_index = 0
         # self.nav_state = VehicleStatus.NAVIGATION_STATE_MAX
-        # self.arm_state = VehicleStatus.ARMING_STATE_MAX
+        self.arm_state = VehicleStatus.ARMING_STATE_MAX
         # self.armFlag = False
         # self.arucoID = 0
         # self.arucoFlag = False
@@ -117,13 +133,20 @@ class OffboardControl(Node):
         #     { 'trigger': 'land', 'source': 'SCAN', 'dest': 'LAND' }
         # ]
 
-        self.droneState = DroneState()
-
         # machine = Machine(self.droneState, states=self.states, initial= 'IDLE')
 
         # machine.add_transition('takeoff', 'IDLE', 'TAKEOFF')
         # machine.add_transition('offboard', 'IDLE', 'OFFBOARD')
 
+        self.states=['IDLE', 'ARM', 'TAKEOFF', 'LOITER', 'SEARCH', 'SCAN', 'LAND']
+        
+        self.droneState = DroneState()
+        self.machine = Machine(model=self.droneState , states=self.states, initial= 'IDLE')
+        
+
+        self.machine.add_transition('trs_next', 'IDLE', 'ARM', conditions = lambda: self.arm_state == VehicleStatus.ARMING_STATE_ARMED)
+        self.machine.add_transition('trs_next', 'ARM', 'IDLE', conditions = lambda: self.arm_state != VehicleStatus.ARMING_STATE_ARMED)
+        self.machine.add_transition('trs_next', 'ARM', 'TAKEOFF', conditions=['takeoff_check'])
         
   
         timer_state = 0.1  # seconds
@@ -135,7 +158,8 @@ class OffboardControl(Node):
 
     def vehicle_status_callback(self, msg):
         OffboardControl.nav_state = msg.nav_state
-        OffboardControl.arm_state = msg.arming_state
+        #OffboardControl.arm_state = msg.arming_state
+        self.arm_state = msg.arming_state
 
     
     def localpos_callback(self, msg):
@@ -196,15 +220,15 @@ class OffboardControl(Node):
         # self.aruco_roll, self.aruco_pitch, self.aruco_yaw = euler_from_quaternion(self.aruco_q)
         
 
-    def setpointChecker(self):
-        #Check odom if x500 has reached the setpoint
-        setpointReached = False
-        sp2Validiate = self.setpoints
-        sp2ValidiateAruco = self.aruco_setpoint
+    # def setpointChecker(self):
+    #     #Check odom if x500 has reached the setpoint
+    #     setpointReached = False
+    #     sp2Validiate = self.setpoints
+    #     sp2ValidiateAruco = self.aruco_setpoint
 
-        if (sp2Validiate[0] - 0.05 < self.curr_x < sp2Validiate[0] + 0.05) and (sp2Validiate[1] - 0.05 < self.curr_y < sp2Validiate[1] + 0.05) and (sp2Validiate[2] + 0.05 > self.curr_z > sp2Validiate[2] - 0.05):
-            if (-0.08 < self.curr_vx < 0.08) and  (-0.08 < self.curr_vy < 0.08) and  (0.08 > self.curr_vz > -0.08):
-                setpointReached = True
+    #     if (sp2Validiate[0] - 0.05 < self.curr_x < sp2Validiate[0] + 0.05) and (sp2Validiate[1] - 0.05 < self.curr_y < sp2Validiate[1] + 0.05) and (sp2Validiate[2] + 0.05 > self.curr_z > sp2Validiate[2] - 0.05):
+    #         if (-0.08 < self.curr_vx < 0.08) and  (-0.08 < self.curr_vy < 0.08) and  (0.08 > self.curr_vz > -0.08):
+    #             setpointReached = True
 
 
         # if self.arucoFlag == True:
@@ -220,20 +244,20 @@ class OffboardControl(Node):
                 
         #Stil need one for orientation
 
-        return setpointReached
+        #return setpointReached
 
     
-    def arm(self):
-        self.publish_vehicle_command(VehicleCommand.VEHICLE_CMD_COMPONENT_ARM_DISARM, 1.0)
-        self.get_logger().info('Arm command sent')
+    # def arm(self):
+    #     self.publish_vehicle_command(VehicleCommand.VEHICLE_CMD_COMPONENT_ARM_DISARM, 1.0)
+    #     self.get_logger().info('Arm command sent')
 
 
-    def disarm(self):
-        self.publish_vehicle_command(VehicleCommand.VEHICLE_CMD_COMPONENT_ARM_DISARM, 0.0)
-        self.get_logger().info('Disarm command sent')
-        self.get_logger().info('Shutting down ROS node...')
-        self.destroy_node()
-        rclpy.shutdown()
+    # def disarm(self):
+    #     self.publish_vehicle_command(VehicleCommand.VEHICLE_CMD_COMPONENT_ARM_DISARM, 0.0)
+    #     self.get_logger().info('Disarm command sent')
+    #     self.get_logger().info('Shutting down ROS node...')
+    #     self.destroy_node()
+    #     rclpy.shutdown()
     
 
     # #This function needs to be customized. I can't use this because I loose control of drone position if I used PX4 Landing System
@@ -314,10 +338,12 @@ class OffboardControl(Node):
 
         # self.droneState.test()
         # print(self.droneState.state)
-
-        if self.droneState.state == 'IDLE':
-            setpoint_to = [0.0, 0.0, -1.25, 0.0]
-            self.droneState.trigger(setpoint_to)
+        print(self.droneState.state)
+        self.droneState.trs_next()
+        
+        # if self.droneState.state == 'IDLE':
+        #     setpoint_to = [0.0, 0.0, -1.25, 0.0]
+        #     self.droneState.trigger(setpoint_to)
         
             
 
