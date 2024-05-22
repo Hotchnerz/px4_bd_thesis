@@ -29,6 +29,8 @@ class DroneState():
     
     def test(self):
         print(OffboardControl.nav_state)
+        # print(OffboardControl.curr_pos)
+        # print(OffboardControl.setpoints)
         return False
 
     def arm_check(self):
@@ -45,29 +47,43 @@ class DroneState():
         OffboardControl.setpoints[1] = set_y
         OffboardControl.setpoints[2] = set_z
         OffboardControl.setpoints[3] = set_yaw
+
+    def on_enter_FAILSAFE(self, *args):
+        print('FAILSAFE ENTERED, RESTART PROGRAM...')
     
-    def takeoff_check(self):
-        if OffboardControl.arm_state == VehicleStatus.ARMING_STATE_ARMED and OffboardControl.nav_state != VehicleStatus.NAVIGATION_STATE_OFFBOARD:
-            return True
+    def on_enter_TAKEOFF(self, *args):
+        self.update_setpoint([0,0,-1.25,0])
+        #self.get_logger().info("Sending Takeoff Setpoint")
+        print("Sending Takeoff Setpoint")
 
-    # def setpointChecker(self):
-    #     #Check odom if x500 has reached the setpoint
-    #     setpointReached = False
-    #     sp2Validiate = self.setpoints
-    #     sp2ValidiateAruco = self.aruco_setpoint
+    def on_exit_IDLE(self, *args):
+        print(OffboardControl.home_pos)
+    
 
-    #     if (sp2Validiate[0] - 0.05 < self.curr_x < sp2Validiate[0] + 0.05) and (sp2Validiate[1] - 0.05 < self.curr_y < sp2Validiate[1] + 0.05) and (sp2Validiate[2] + 0.05 > self.curr_z > sp2Validiate[2] - 0.05):
-    #         if (-0.08 < self.curr_vx < 0.08) and  (-0.08 < self.curr_vy < 0.08) and  (0.08 > self.curr_vz > -0.08):
-    #             setpointReached = True
-            #return setpointReached
+    def setpointChecker(self):
+        #Check odom if x500 has reached the setpoint
+        setpointReached = False
+        sp2Validiate = OffboardControl.setpoints
+
+        if (sp2Validiate[0] - 0.05 < OffboardControl.curr_pos[0] < sp2Validiate[0] + 0.05) and (sp2Validiate[1] - 0.05 < OffboardControl.curr_pos[1]< sp2Validiate[1] + 0.05) and (sp2Validiate[2] + 0.05 > OffboardControl.curr_pos[2] > sp2Validiate[2] - 0.05):
+            if (-0.08 < OffboardControl.curr_vel[0] < 0.08) and  (-0.08 < OffboardControl.curr_vel[1] < 0.08) and  (0.08 > OffboardControl.curr_vel[2] > -0.08):
+                setpointReached = True
+
+        return setpointReached
 
 
 class OffboardControl(Node):
 
     nav_state = VehicleStatus.NAVIGATION_STATE_MAX
     #arm_state = VehicleStatus.ARMING_STATE_MAX
+
+    # Set as x, y ,z , yaw (NED)
     setpoints = [0.0, 0.0, 0.0, 0.0]
     home_pos = [0.0, 0.0, 0.0, 0.0]
+    curr_pos = [0.0, 0.0, 0.0, 0.0]
+    curr_vel = [0.0, 0.0, 0.0, 0.0]
+    curr_accel = [0.0, 0.0, 0.0, 0.0]
+
 
     def __init__(self):
         super().__init__('offboard_control_landing')
@@ -94,9 +110,9 @@ class OffboardControl(Node):
         self.aruco_baselink_subscriber = self.create_subscription(Pose, '/aruco_baselink', self.aruco_baselink_callback, qos_profile)
 
 
-        self.curr_x, self.curr_y, self.curr_z, self.curr_yaw = 0.0, 0.0, 0.0, 0.0
-        self.curr_vx, self.curr_vy, self.curr_vz = 0.0, 0.0, 0.0
-        self.curr_ax, self.curr_ay, self.curr_az = 0.0, 0.0, 0.0
+        # self.curr_x, self.curr_y, self.curr_z, self.curr_yaw = 0.0, 0.0, 0.0, 0.0
+        # self.curr_vx, self.curr_vy, self.curr_vz = 0.0, 0.0, 0.0
+        # self.curr_ax, self.curr_ay, self.curr_az = 0.0, 0.0, 0.0
         # self.aruco_x, self.aruco_y, self.aruco_z = 1.5, 1.5, -1.5
         # self.home_x, self.home_y, self.home_z, self.home_yaw = 0.0, 0.0, 0.0, 0.0
         #self.set_x, self.set_y, self.set_z, self.set_yaw = 0.0, 0.0, 0.0, 0.0
@@ -111,8 +127,9 @@ class OffboardControl(Node):
         self.timestamp = 0
         self.offboard_counter = 0
         # self.current_setpoint_index = 0
-        # self.nav_state = VehicleStatus.NAVIGATION_STATE_MAX
+        self.nav_state = VehicleStatus.NAVIGATION_STATE_MAX
         self.arm_state = VehicleStatus.ARMING_STATE_MAX
+        self.failsafe_state = False
         # self.armFlag = False
         # self.arucoID = 0
         # self.arucoFlag = False
@@ -138,7 +155,7 @@ class OffboardControl(Node):
         # machine.add_transition('takeoff', 'IDLE', 'TAKEOFF')
         # machine.add_transition('offboard', 'IDLE', 'OFFBOARD')
 
-        self.states=['IDLE', 'ARM', 'TAKEOFF', 'LOITER', 'SEARCH', 'SCAN', 'LAND']
+        self.states=['IDLE', 'FAILSAFE', 'ARM', 'TAKEOFF', 'LOITER', 'SEARCH', 'SCAN', 'LAND']
         
         self.droneState = DroneState()
         self.machine = Machine(model=self.droneState , states=self.states, initial= 'IDLE')
@@ -146,8 +163,22 @@ class OffboardControl(Node):
 
         self.machine.add_transition('trs_next', 'IDLE', 'ARM', conditions = lambda: self.arm_state == VehicleStatus.ARMING_STATE_ARMED)
         self.machine.add_transition('trs_next', 'ARM', 'IDLE', conditions = lambda: self.arm_state != VehicleStatus.ARMING_STATE_ARMED)
-        self.machine.add_transition('trs_next', 'ARM', 'TAKEOFF', conditions=['takeoff_check'])
-        
+        self.machine.add_transition('trs_next', 'ARM', 'TAKEOFF', conditions = lambda: self.nav_state == VehicleStatus.NAVIGATION_STATE_OFFBOARD and self.offboard_counter > 10)
+
+        #Need to ensure that if this state transition occurs, some sort of clean up like go back into manual mode or pos mode and restart back to Arm or Idle depending on conds.
+        self.machine.add_transition('trs_next', 'TAKEOFF', 'FAILSAFE', conditions = lambda: self.failsafe_state == True)
+        self.machine.add_transition('trs_next', 'FAILSAFE', 'FAILSAFE')
+        self.machine.add_transition('trs_next', 'TAKEOFF', 'LOITER', conditions=['setpointChecker'])
+        self.machine.add_transition('trs_next', 'LOITER', 'SEARCH', conditions=['setpointChecker', ])
+        self.machine.add_transition('trs_next', 'SEARCH', 'SEARCH', conditions=['test'])
+
+
+
+
+
+
+
+
   
         timer_state = 0.1  # seconds
         self.timer_offboard = self.create_timer(timer_state, self.state_callback)
@@ -157,30 +188,44 @@ class OffboardControl(Node):
 
 
     def vehicle_status_callback(self, msg):
-        OffboardControl.nav_state = msg.nav_state
+        #OffboardControl.nav_state = msg.nav_state
         #OffboardControl.arm_state = msg.arming_state
         self.arm_state = msg.arming_state
+        self.nav_state = msg.nav_state
+        self.failsafe_state = msg.failsafe
 
     
     def localpos_callback(self, msg):
-        self.curr_x = msg.x
-        self.curr_y = msg.y
-        self.curr_z = msg.z
+        # self.curr_x = msg.x
+        # self.curr_y = msg.y
+        # self.curr_z = msg.z
 
-        self.curr_vx = msg.vx
-        self.curr_vy = msg.vy
-        self.curr_vz = msg.vz
+        # self.curr_vx = msg.vx
+        # self.curr_vy = msg.vy
+        # self.curr_vz = msg.vz
 
-        self.curr_ax = msg.ax
-        self.curr_ay = msg.ay
-        self.curr_az = msg.az
+        # self.curr_ax = msg.ax
+        # self.curr_ay = msg.ay
+        # self.curr_az = msg.az
 
+        self.curr_pos[0] = msg.x
+        self.curr_pos[1] = msg.y
+        self.curr_pos[2] = msg.z
+
+        self.curr_vel[0] = msg.vx
+        self.curr_vel[1] = msg.vy
+        self.curr_vel[2] = msg.vz
+
+        self.curr_accel[0] = msg.ax
+        self.curr_accel[1] = msg.ay
+        self.curr_accel[2] = msg.az
+        
         self.timestamp = msg.timestamp
 
         if self.homeSetPos == False:
-            self.home_pos[0] = self.curr_x
-            self.home_pos[1] = self.curr_y
-            self.home_pos[2] = self.curr_z
+            self.home_pos[0] = self.curr_pos[0]
+            self.home_pos[1] = self.curr_pos[1]
+            self.home_pos[2] = self.curr_pos[2]
 
             self.homeSetPos = True
     
@@ -318,9 +363,9 @@ class OffboardControl(Node):
         msg.timestamp = self.timestamp
         #msg.x, msg.y, msg.z, msg.yaw = setpoint[index]
         msg.x, msg.y, msg.z= setpoint[0], setpoint[1], setpoint[2]
-        vel_x = (setpoint[0] - self.curr_x) / 2
-        vel_y = (setpoint[1] - self.curr_y) / 2
-        vel_z = (setpoint[2] - self.curr_z) / 2
+        vel_x = (setpoint[0] - self.curr_pos[0]) / 2
+        vel_y = (setpoint[1] - self.curr_pos[1]) / 2
+        vel_z = (setpoint[2] - self.curr_pos[2]) / 2
         msg.vx, msg.vy, msg.vz = vel_x, vel_y, vel_z
         self.trajectory_pub.publish(msg)
     
