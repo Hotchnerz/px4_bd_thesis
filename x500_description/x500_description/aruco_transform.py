@@ -40,7 +40,7 @@ class ArucoPoseBaseLink(Node):
         self.aruco_poses_subscriber = self.create_subscription(PoseArray, 'aruco_poses', self.aruco_poses_callback, 10)
 
         # Call on_timer function every second
-        self.timer = self.create_timer(1.0, self.on_timer)
+        self.timer = self.create_timer(0.2, self.on_timer)
 
     def aruco_poses_callback(self, msg):
         for pose in msg.poses:
