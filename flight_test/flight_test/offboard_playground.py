@@ -14,6 +14,7 @@ class DroneState():
     def __init__(self):
         self.final_setpoint = [0,0,0]
         self.flight_height = -1.20
+        self.new_z = self.flight_height
         self.reset_moving_avg = False
         self.x_setpoints = []
         self.y_setpoints = []
@@ -116,7 +117,6 @@ class DroneState():
         return moving_avg_x, moving_avg_y
 
 
-            
     
     def scan_check(self):
 
@@ -126,8 +126,6 @@ class DroneState():
         
         return False
 
-
-
     
     def set_takeoff_setpoint(self):
         self.update_setpoint([0,0,self.flight_height,0])
@@ -135,23 +133,23 @@ class DroneState():
         print("Sending Takeoff Setpoint")
     
     def set_approach_setpoint(self):
-        self.update_setpoint([np.median(self.x_app_setpoint_app),np.median(self.y_app_setpoint_app),OffboardControl.curr_pos[2],OffboardControl.marker_pos[3]])
+        self.update_setpoint([np.median(self.x_app_setpoint_app),np.median(self.y_app_setpoint_app), self.flight_height,OffboardControl.marker_pos[3]])
         #self.update_setpoint([1.25944,0.0202361,-1.25,OffboardControl.marker_pos[3]])
         print("Approaching Marker")
     
     def set_final_setpoint(self):
-        self.final_setpoint[0] = OffboardControl.curr_pos[0]
-        self.final_setpoint[1] = OffboardControl.curr_pos[1]
-        self.final_setpoint[2] = OffboardControl.curr_pos[3]
+        self.final_setpoint[0] = OffboardControl.curr_pos[0] - OffboardControl.home_pos[0]
+        self.final_setpoint[1] = OffboardControl.curr_pos[1] - OffboardControl.home_pos[1]
+        self.final_setpoint[2] = OffboardControl.curr_pos[3] - OffboardControl.home_pos[3]
     
     def landing_check(self):
         
         drone_land = False
-        new_z = OffboardControl.curr_pos[2] + 0.08
-        self.update_setpoint([self.final_setpoint[0], self.final_setpoint[1], new_z, self.final_setpoint[2]])
+        self.new_z += 0.04
+        self.update_setpoint([self.final_setpoint[0], self.final_setpoint[1], self.new_z, self.final_setpoint[2]])
         #self.update_setpoint([1.25944,0.0202361, new_z, OffboardControl.marker_pos[3]])
             #return drone_land
-        if (0.02 > OffboardControl.curr_pos[2] > -0.02):
+        if ((0.02 + OffboardControl.home_pos[2]) > OffboardControl.curr_pos[2] > (-0.02 + OffboardControl.home_pos[2])):
             drone_land = True
             
         return drone_land
@@ -207,7 +205,7 @@ class OffboardControl(Node):
         
 
 
-        self.states=['IDLE', 'FAILSAFE', 'ARM', 'DISARM', 'TAKEOFF', 'LOITER', 'SEARCH', 'SCAN','APPROACH', 'LAND']
+        self.states=['IDLE', 'FAILSAFE', 'ARM', 'DISARM', 'TAKEOFF', 'LOITER', 'SEARCH', 'SCAN','APPROACH', 'FINAPP', 'LAND']
         
         self.droneState = DroneState()
         self.machine = Machine(model=self.droneState , states=self.states, initial= 'IDLE')
@@ -229,7 +227,9 @@ class OffboardControl(Node):
         #Perform another scan?
         self.machine.add_transition('trs_next', 'APPROACH', 'SCAN', conditions=['setpoint_check', 'attitude_check'])
 
-        self.machine.add_transition('trs_next', 'SCAN', 'LAND', prepare=['set_final_setpoint'], conditions=['scan_check','setpoint_check', 'attitude_check'], unless=['distance_check'])
+        self.machine.add_transition('trs_next', 'SCAN', 'FINAPP', before=['set_approach_setpoint'], conditions=['scan_check', 'marker_found'], unless=['distance_check'])
+
+        self.machine.add_transition('trs_next', 'FINAPP', 'LAND', prepare=['set_final_setpoint'], conditions=['setpoint_check', 'attitude_check'])
         self.machine.add_transition('trs_next', 'LAND', 'DISARM', conditions=['landing_check'])
         self.machine.add_transition('trs_next', 'DISARM', 'IDLE', conditions = lambda: self.arm_state == VehicleStatus.ARMING_STATE_STANDBY)
 
@@ -397,8 +397,6 @@ class OffboardControl(Node):
     def state_callback(self):
         print(self.droneState.state)
         self.droneState.trs_next()
-        print(OffboardControl.marker_pos_x)
-        print(OffboardControl.marker_pos_y)
         if self.droneState.state == 'DISARM':
             self.land()
         
