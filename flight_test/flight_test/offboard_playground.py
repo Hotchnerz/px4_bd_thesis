@@ -14,6 +14,7 @@ class DroneState():
     def __init__(self):
         self.final_setpoint = [0,0,0]
         self.flight_height = -1.20
+        self.new_z = self.flight_height
         self.reset_moving_avg = False
         self.x_setpoints = []
         self.y_setpoints = []
@@ -132,23 +133,23 @@ class DroneState():
         print("Sending Takeoff Setpoint")
     
     def set_approach_setpoint(self):
-        self.update_setpoint([np.median(self.x_app_setpoint_app),np.median(self.y_app_setpoint_app),OffboardControl.curr_pos[2],OffboardControl.marker_pos[3]])
+        self.update_setpoint([np.median(self.x_app_setpoint_app),np.median(self.y_app_setpoint_app), self.flight_height,OffboardControl.marker_pos[3]])
         #self.update_setpoint([1.25944,0.0202361,-1.25,OffboardControl.marker_pos[3]])
         print("Approaching Marker")
     
     def set_final_setpoint(self):
-        self.final_setpoint[0] = OffboardControl.curr_pos[0]
-        self.final_setpoint[1] = OffboardControl.curr_pos[1]
-        self.final_setpoint[2] = OffboardControl.curr_pos[3]
+        self.final_setpoint[0] = OffboardControl.curr_pos[0] - OffboardControl.home_pos[0]
+        self.final_setpoint[1] = OffboardControl.curr_pos[1] - OffboardControl.home_pos[1]
+        self.final_setpoint[2] = OffboardControl.curr_pos[3] - OffboardControl.home_pos[3]
     
     def landing_check(self):
         
         drone_land = False
-        new_z = OffboardControl.curr_pos[2] + 0.04
-        self.update_setpoint([self.final_setpoint[0], self.final_setpoint[1], new_z, self.final_setpoint[2]])
+        self.new_z += 0.04
+        self.update_setpoint([self.final_setpoint[0], self.final_setpoint[1], self.new_z, self.final_setpoint[2]])
         #self.update_setpoint([1.25944,0.0202361, new_z, OffboardControl.marker_pos[3]])
             #return drone_land
-        if (0.02 > OffboardControl.curr_pos[2] > -0.02):
+        if ((0.02 + OffboardControl.home_pos[2]) > OffboardControl.curr_pos[2] > (-0.02 + OffboardControl.home_pos[2])):
             drone_land = True
             
         return drone_land
