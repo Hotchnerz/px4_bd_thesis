@@ -149,7 +149,7 @@ class DroneState():
         self.update_setpoint([self.final_setpoint[0], self.final_setpoint[1], self.new_z, self.final_setpoint[2]])
         #self.update_setpoint([1.25944,0.0202361, new_z, OffboardControl.marker_pos[3]])
             #return drone_land
-        if ((0.06 + OffboardControl.home_pos[2]) > OffboardControl.curr_pos[2] > (-0.06 + OffboardControl.home_pos[2])):
+        if ((0.02 + OffboardControl.home_pos[2]) > OffboardControl.curr_pos[2] > (-0.02 + OffboardControl.home_pos[2])):
             drone_land = True
             
         return drone_land
