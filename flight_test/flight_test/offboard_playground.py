@@ -76,7 +76,7 @@ class DroneState():
 
     def distance_check(self):
         print(np.sqrt(np.square(OffboardControl.curr_pos[0] - OffboardControl.marker_pos[0]) + np.square(OffboardControl.curr_pos[1] - OffboardControl.marker_pos[1])))
-        return (np.sqrt(np.square(OffboardControl.curr_pos[0] - OffboardControl.marker_pos[0]) + np.square(OffboardControl.curr_pos[1] - OffboardControl.marker_pos[1]))) > 0.08
+        return (np.sqrt(np.square(OffboardControl.curr_pos[0] - OffboardControl.marker_pos[0]) + np.square(OffboardControl.curr_pos[1] - OffboardControl.marker_pos[1]))) > 0.3
         #return (np.sqrt(np.square(OffboardControl.curr_pos[0] - 1.25944) + np.square(OffboardControl.curr_pos[1] - 0.0202361))) > 0.05
 
     def setpoint_check(self):
@@ -133,7 +133,7 @@ class DroneState():
         print("Sending Takeoff Setpoint")
     
     def set_approach_setpoint(self):
-        self.update_setpoint([np.median(self.x_app_setpoint_app),np.median(self.y_app_setpoint_app), self.flight_height,OffboardControl.marker_pos[3]])
+        self.update_setpoint([np.median(self.x_app_setpoint_app),(np.median(self.y_app_setpoint_app))*-1, self.flight_height,OffboardControl.marker_pos[3]])
         #self.update_setpoint([1.25944,0.0202361,-1.25,OffboardControl.marker_pos[3]])
         print("Approaching Marker")
     
@@ -149,8 +149,8 @@ class DroneState():
         self.update_setpoint([self.final_setpoint[0], self.final_setpoint[1], self.new_z, self.final_setpoint[2]])
         #self.update_setpoint([1.25944,0.0202361, new_z, OffboardControl.marker_pos[3]])
             #return drone_land
-        if ((0.02 + OffboardControl.home_pos[2]) > OffboardControl.curr_pos[2] > (-0.02 + OffboardControl.home_pos[2])):
-            drone_land = True
+        # if ((0.06 + OffboardControl.home_pos[2]) > OffboardControl.curr_pos[2] > (-0.06 + OffboardControl.home_pos[2])):
+        #     drone_land = True
             
         return drone_land
             
@@ -398,7 +398,8 @@ class OffboardControl(Node):
         print(self.droneState.state)
         self.droneState.trs_next()
         if self.droneState.state == 'DISARM':
-            self.land()
+            self.disarm()
+            #self.land()
         
 
     # #Where I want state changes to occur

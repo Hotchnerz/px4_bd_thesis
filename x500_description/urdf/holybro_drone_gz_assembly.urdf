@@ -5,6 +5,7 @@
 <robot
   name="holybro_drone_assembly">
   <link name= "base_footprint" />
+  <link name= "base_link_NED" />
   <link
     name="base_link">
     <visual>
@@ -129,9 +130,20 @@
     type="fixed">
     <origin
       xyz="0 0 -0.21528"
-      rpy="3.14 0 0" />
+      rpy="0 0 0" />
     <parent
       link="base_footprint" />
+    <child
+      link="base_link_NED" />
+  </joint>
+  <joint
+    name="body_link_NED"
+    type="fixed">
+    <origin
+      xyz="0 0 -0.0398999999999999"
+      rpy="3.14 0 0" />
+    <parent
+      link="base_link_NED" />
     <child
       link="base_link" />
   </joint>

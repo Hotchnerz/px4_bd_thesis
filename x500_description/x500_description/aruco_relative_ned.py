@@ -13,7 +13,7 @@ from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy, QoSDur
 from turtlesim.srv import Spawn
 
 
-class ArucoPoseBaseLink(Node):
+class ArucoPoseNEDBaseLink(Node):
 
     def __init__(self):
         super().__init__('aruco_tf2_pose_ned_publisher')
@@ -35,12 +35,12 @@ class ArucoPoseBaseLink(Node):
         self.tf_listener = TransformListener(self.tf_buffer, self)
 
         # Create pose publisher
-        self.publisher = self.create_publisher(Pose, '/aruco_baselink', qos_profile)
+        self.publisher = self.create_publisher(Pose, '/aruco_ned', qos_profile)
         
         self.aruco_poses_subscriber = self.create_subscription(PoseArray, 'aruco_poses', self.aruco_poses_callback, 10)
 
         # Call on_timer function every second
-        self.timer = self.create_timer(1.0, self.on_timer)
+        self.timer = self.create_timer(0.1, self.on_timer)
 
     def aruco_poses_callback(self, msg):
         for pose in msg.poses:
@@ -53,7 +53,7 @@ class ArucoPoseBaseLink(Node):
         # compute transformations
         # from_frame_rel = self.target_frame
         from_frame_rel = 'aruco_link'
-        to_frame_rel = 'map'
+        to_frame_rel = 'base_link_NED'
 
         if self.aruco_x and self.aruco_y and self.aruco_z != 0.0:
             try:
@@ -79,7 +79,7 @@ class ArucoPoseBaseLink(Node):
 
 def main():
     rclpy.init()
-    node = ArucoPoseBaseLink()
+    node = ArucoPoseNEDBaseLink()
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:
