@@ -29,11 +29,12 @@ rtps:
     send: true
   - msg: TimesyncStatus
     send: true
-  - msg: ManualControlSwitches
-    send: true
   - msg: VehicleLocalPosition
     send: true
   - msg: VehicleAttitude
     send: true
   - msg: LandingTargetPose
     receive: true
+  - msg: VehicleAttitudeSetpoint
+    receive: true
+    send: true

@@ -8,6 +8,13 @@ import os
 def generate_launch_description():
     ld = LaunchDescription()
 
+    image_proc = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            os.path.join(get_package_share_directory('image_proc'),
+                         'launch/image_proc.launch.py')
+    )
+    )
+
     usb_cam_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             os.path.join(get_package_share_directory('usb_cam'),
@@ -42,6 +49,7 @@ def generate_launch_description():
         executable="aruco_transform"
     )
     
+    ld.add_action(image_proc)
     ld.add_action(usb_cam_launch)
     ld.add_action(gazebo_aruco_node)
     ld.add_action(drone_urdf_launch)

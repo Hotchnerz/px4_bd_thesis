@@ -7,13 +7,13 @@ from rclpy.clock import Clock
 from tf_transformations import euler_from_quaternion
 from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy, QoSDurabilityPolicy
 
-from px4_msgs.msg import OffboardControlMode, TrajectorySetpoint, VehicleStatus, VehicleCommand, Timesync, VehicleOdometry, VehicleLocalPosition, VehicleLocalPositionSetpoint, LandingTargetPose, VehicleAttitude
+from px4_msgs.msg import OffboardControlMode, TrajectorySetpoint, VehicleStatus, VehicleCommand, Timesync, VehicleLocalPosition, VehicleLocalPositionSetpoint, VehicleAttitude, VehicleAttitudeSetpoint
 from ros2_aruco_interfaces.msg import ArucoMarkers
 
 class DroneState():
     def __init__(self):
         self.final_setpoint = [0,0,0]
-        self.flight_height = -1.20
+        self.flight_height = -1.00
         self.new_z = self.flight_height
         self.reset_moving_avg = False
         self.x_setpoints = []
@@ -149,7 +149,7 @@ class DroneState():
         self.update_setpoint([self.final_setpoint[0], self.final_setpoint[1], self.new_z, self.final_setpoint[2]])
         #self.update_setpoint([1.25944,0.0202361, new_z, OffboardControl.marker_pos[3]])
             #return drone_land
-        if ((0.02 + OffboardControl.home_pos[2]) > OffboardControl.curr_pos[2] > (-0.02 + OffboardControl.home_pos[2])):
+        if OffboardControl.curr_thrust >= -0.12:
             drone_land = True
             
         return drone_land
@@ -169,6 +169,7 @@ class OffboardControl(Node):
     marker_pos_y = []
 
     rpy = (0,0,0)
+    curr_thrust = 0
     aruco_found = False
     first_aruco_msg = False
 
@@ -191,6 +192,7 @@ class OffboardControl(Node):
         self.drone_status_sub = self.create_subscription(VehicleStatus, '/fmu/vehicle_status/out', self.vehicle_status_callback, qos_profile)
         self.localpos_subscriber = self.create_subscription(VehicleLocalPosition, '/fmu/vehicle_local_position/out', self.localpos_callback, qos_profile)
         self.vehicle_att_subscriber = self.create_subscription(VehicleAttitude, '/fmu/vehicle_attitude/out', self.vehicle_att_callback, qos_profile)
+        self.vehicle_att_set_subscriber = self.create_subscription(VehicleAttitudeSetpoint, '/fmu/vehicle_attitude_setpoint/out', self.vehicle_att_set_callback, qos_profile)
         self.aruco_subscriber = self.create_subscription(ArucoMarkers, '/aruco_markers', self.aruco_callback, 10)
         self.aruco_baselink_subscriber = self.create_subscription(Pose, '/aruco_baselink', self.aruco_baselink_callback, qos_profile)
 
@@ -282,6 +284,9 @@ class OffboardControl(Node):
         if self.homeSetYaw == False:
             self.home_pos[3] = self.curr_yaw
             self.homeSetYaw = True
+    
+    def vehicle_att_set_callback(self, msg):
+        OffboardControl.curr_thrust = msg.thrust_body[2]
 
     #NEED TO WORK ON THIS
     def aruco_callback(self, msg):
@@ -330,7 +335,7 @@ class OffboardControl(Node):
 
     def disarm(self):
         #self.publish_vehicle_command(VehicleCommand.VEHICLE_CMD_DO_FLIGHTTERMINATION, 1.0)
-        self.publish_vehicle_command(VehicleCommand.VEHICLE_CMD_COMPONENT_ARM_DISARM, 0.0)
+        self.publish_vehicle_command(VehicleCommand.VEHICLE_CMD_COMPONENT_ARM_DISARM, 0.0, 21196)
         print("DISARM COMMAND CALLED")
         # self.get_logger().info('Disarm command sent')
         # self.get_logger().info('Shutting down ROS node...')
