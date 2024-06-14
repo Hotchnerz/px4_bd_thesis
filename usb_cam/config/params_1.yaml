@@ -1,7 +1,7 @@
 /**:
     ros__parameters:
       video_device: "/dev/video0"
-      framerate: 60.0
+      framerate: 45.0
       io_method: "mmap"
       frame_id: "camera_link"
       pixel_format: "mjpeg2rgb"  # see usb_cam/supported_formats for list of supported formats
