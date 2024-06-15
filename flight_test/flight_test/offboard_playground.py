@@ -12,7 +12,7 @@ from ros2_aruco_interfaces.msg import ArucoMarkers
 
 class DroneState():
     def __init__(self):
-        self.final_setpoint = [0,0,0,0]
+        self.final_setpoint = [0,0,0]
         self.flight_height = -1.00
         self.new_z = self.flight_height
         self.reset_moving_avg = False
@@ -20,8 +20,6 @@ class DroneState():
         self.y_setpoints = []
         self.x_app_setpoint_app = []
         self.y_app_setpoint_app = []
-        self.hold_z = 0
-        self.steady = True
 
     
     def test(self):
@@ -142,28 +140,15 @@ class DroneState():
     def set_final_setpoint(self):
         self.final_setpoint[0] = OffboardControl.curr_pos[0] - OffboardControl.home_pos[0]
         self.final_setpoint[1] = OffboardControl.curr_pos[1] - OffboardControl.home_pos[1]
-        self.final_setpoint[2] = OffboardControl.curr_pos[2] - OffboardControl.home_pos[2]
-        self.final_setpoint[3] = OffboardControl.curr_pos[3] - OffboardControl.home_pos[3]
+        self.final_setpoint[2] = OffboardControl.curr_pos[3] - OffboardControl.home_pos[3]
     
     def landing_check(self):
         
         drone_land = False
-        # self.new_z += 0.04
-
-        if self.steady == False:
-            if (-0.04 < OffboardControl.curr_vel[0] < 0.04) and  (-0.04 < OffboardControl.curr_vel[1] < 0.04) and  (0.04 > OffboardControl.curr_vel[2] > -0.04):
-                self.steady = True
-
-        if (np.sqrt(np.square(OffboardControl.curr_pos[0] - self.final_setpoint[0]) + np.square(OffboardControl.curr_pos[1] - self.final_setpoint[1]))) <= 0.05 and self.steady == True:
-            self.final_setpoint[2] += 0.04
-            self.update_setpoint([self.final_setpoint[0], self.final_setpoint[1], self.final_setpoint[2], self.final_setpoint[3]])
-            self.hold_z = self.final_setpoint[2]
-        elif (np.sqrt(np.square(OffboardControl.curr_pos[0] - self.final_setpoint[0]) + np.square(OffboardControl.curr_pos[1] - self.final_setpoint[1]))) > 0.05:
-            self.update_setpoint([self.final_setpoint[0], self.final_setpoint[1], self.hold_z, self.final_setpoint[3]])
-            self.steady = False
+        self.new_z += 0.04
+        self.update_setpoint([self.final_setpoint[0], self.final_setpoint[1], self.new_z, self.final_setpoint[2]])
         #self.update_setpoint([1.25944,0.0202361, new_z, OffboardControl.marker_pos[3]])
             #return drone_land
-
         if OffboardControl.curr_thrust >= -0.12:
             drone_land = True
             
