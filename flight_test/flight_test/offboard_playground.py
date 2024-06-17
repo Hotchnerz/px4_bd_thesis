@@ -210,8 +210,6 @@ class OffboardControl(Node):
         self.states=['IDLE', 'FAILSAFE', 'ARM', 'DISARM', 'TAKEOFF', 'LOITER', 'SEARCH', 'SCAN','APPROACH', 'FINAPP', 'LAND']
         
         self.droneState = DroneState()
-        self.machine = Machine(model=self.droneState , states=self.states, initial= 'IDLE')
-        
 
         self.machine.add_transition('trs_next', 'IDLE', 'ARM', conditions = lambda: self.arm_state == VehicleStatus.ARMING_STATE_ARMED)
         self.machine.add_transition('trs_next', 'ARM', 'IDLE', conditions = lambda: self.arm_state != VehicleStatus.ARMING_STATE_ARMED)
@@ -234,8 +232,6 @@ class OffboardControl(Node):
         self.machine.add_transition('trs_next', 'FINAPP', 'LAND', prepare=['set_final_setpoint'], conditions=['setpoint_check', 'attitude_check'])
         self.machine.add_transition('trs_next', 'LAND', 'DISARM', conditions=['landing_check'])
         self.machine.add_transition('trs_next', 'DISARM', 'IDLE', conditions = lambda: self.arm_state == VehicleStatus.ARMING_STATE_STANDBY)
-
-
 
         #self.machine.add_transition('trs_next', 'LAND', 'IDLE', conditions=['test'])
 
@@ -373,7 +369,7 @@ class OffboardControl(Node):
     def publish_offboard_heartbeat(self):
         msg = OffboardControlMode()
         msg.position = True
-        msg.velocity = False
+        msg.velocity = True
         msg.acceleration = False
         msg.attitude = False
         msg.body_rate = False
@@ -388,13 +384,20 @@ class OffboardControl(Node):
         msg.timestamp = self.timestamp
         #msg.x, msg.y, msg.z, msg.yaw = setpoint[index]
         msg.x, msg.y, msg.z= setpoint[0], setpoint[1], setpoint[2]
-        # vel_x = (setpoint[0] - self.curr_pos[0]) / 2
-        # vel_y = (setpoint[1] - self.curr_pos[1]) / 2
-        # vel_z = (setpoint[2] - self.curr_pos[2]) / 2
+        if self.droneState.state != 'LAND':
+            vel_x = np.nan
+            vel_y = np.nan
+            vel_z = np.nan
+        else:
+            vel_x = 0.02
+            vel_y = 0.02
+            vel_z = 0.1
+            #msg.z = np.nan
         # vel_x = 0.6
         # vel_y = 0.6
+        print(msg.z)
         # vel_z = 0.6
-        # msg.vx, msg.vy, msg.vz = vel_x, vel_y, vel_z
+        msg.vx, msg.vy, msg.vz = vel_x, vel_y, vel_z
         self.trajectory_pub.publish(msg)
     
 
