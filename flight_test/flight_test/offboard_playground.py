@@ -395,7 +395,7 @@ class OffboardControl(Node):
         else:
             vel_x = 0.02
             vel_y = 0.02
-            vel_z = 0.1
+            vel_z = 0.06
             #msg.z = np.nan
         # vel_x = 0.6
         # vel_y = 0.6
