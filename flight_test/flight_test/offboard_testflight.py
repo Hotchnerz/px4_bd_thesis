@@ -9,7 +9,7 @@ from tf_transformations import euler_from_quaternion
 from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy, QoSDurabilityPolicy
 import time
 
-from px4_msgs.msg import OffboardControlMode, TrajectorySetpoint, VehicleStatus, VehicleCommand, Timesync, VehicleOdometry, VehicleLocalPosition, VehicleLocalPositionSetpoint, LandingTargetPose, VehicleAttitude
+from px4_msgs.msg import OffboardControlMode, TrajectorySetpoint, VehicleStatus, VehicleCommand, Timesync, VehicleAttitudeSetpoint, VehicleLocalPosition, VehicleLocalPositionSetpoint, LandingTargetPose, VehicleAttitude
 from ros2_aruco_interfaces.msg import ArucoMarkers
 
 class OffboardControl(Node):
@@ -34,6 +34,7 @@ class OffboardControl(Node):
         self.drone_status_sub = self.create_subscription(VehicleStatus, '/fmu/vehicle_status/out', self.vehicle_status_callback, 10)
         self.localpos_subscriber = self.create_subscription(VehicleLocalPosition, '/fmu/vehicle_local_position/out', self.localpos_callback, 10)
         self.vehicle_att_subscriber = self.create_subscription(VehicleAttitude, '/fmu/vehicle_attitude/out', self.vehicle_att_callback, 10)
+        self.vehicle_att_set_subscriber = self.create_subscription(VehicleAttitudeSetpoint, '/fmu/vehicle_attitude_setpoint/out', self.vehicle_att_set_callback, qos_profile)
         self.aruco_subscriber = self.create_subscription(ArucoMarkers, '/aruco_markers', self.aruco_callback, 10)
         self.aruco_baselink_subscriber = self.create_subscription(Pose, '/aruco_baselink', self.aruco_baselink_callback, qos_profile)
 
@@ -63,6 +64,8 @@ class OffboardControl(Node):
         self.start_time = time.time()
         self.exec_time = 0
         self.traj_time = 1.0
+        self.curr_thrust = 0.0
+        self.new = self.home_z + (-1.25)
 
 
         self.setpoints = [(0.0, 0.0, 0.0)]
@@ -81,6 +84,8 @@ class OffboardControl(Node):
         self.nav_state = msg.nav_state
         self.arm_state = msg.arming_state
 
+    def vehicle_att_set_callback(self, msg):
+        self.curr_thrust = msg.thrust_body[2]
     
     def localpos_callback(self, msg):
         self.curr_x = msg.x
@@ -224,13 +229,13 @@ class OffboardControl(Node):
         self.trajectory_pub.publish(msg)
     
 
-    def trajectory_setpoint_publisher(self, setpoint, index):
+    def trajectory_setpoint_publisher(self, setpoint, index, vx = np.nan, vy = np.nan, vz=np.nan):
         msg = TrajectorySetpoint()
         msg.timestamp = self.timestamp
         msg.x, msg.y, msg.z = setpoint[index]
-        vel_x = (setpoint[index][0] - self.curr_x) / 2
-        vel_y = (setpoint[index][1] - self.curr_y) / 2
-        vel_z = (setpoint[index][2] - self.curr_z) / 2
+        vel_x = 0.5
+        vel_y = 0.0
+        vel_z = vz
         msg.vx, msg.vy, msg.vz = vel_x, vel_y, vel_z
         #msg.vx, msg.vy, msg.vz = 0.9, 0.9, 0.9
         self.trajectory_pub.publish(msg)
@@ -258,7 +263,7 @@ class OffboardControl(Node):
             self.armFlag = True
             self.setpoints.clear()
             self.setpoints.append((self.home_x, self.home_y, self.home_z + (-1.25)))
-            self.setpoints.append((self.home_x + (1.5), self.home_y, self.home_z + (-1.25)))
+            self.setpoints.append((self.home_x + (1.27), self.home_y, self.home_z + (-1.25)))
             print(self.nav_state)
             print("ARM")
 
@@ -280,43 +285,44 @@ class OffboardControl(Node):
             print(self.nav_state)
             print("SEARCH")
         
-        #SEARCH STATE --> ARUCO SEARCH AND DETECT
+        # #SEARCH STATE --> ARUCO SEARCH AND DETECT
         elif self.setpointChecker() == True and self.current_setpoint_index == 1:
             #OLD SEARCH ALGORITHIM
-            if self.arucoFound == True and self.arucoID == 122:
-                self.setpoints.append([self.aruco_x, (self.aruco_y * -1), self.home_z + (-1.25)])
-                self.current_setpoint_index = 2
+            self.new += 0.4
+            self.setpoints.append((self.home_x + (1.27), self.home_y, self.home_z + (-1.25)))
             
+            if self.curr_thrust >= -0.12:
+                self.land()         
                 #self.arucoFlag = True
                 # aruco_q = [self.aruco_qx, self.aruco_qy, self.aruco_qz, self.aruco_qw]
                 # self.aruco_yaw = euler_from_quaternion(aruco_q)
                 
-            #UTILIZE RUNNING AVERAGE LATER ON
-                while self.arucoCount != 20:
-                    self.arucoSample_x += self.aruco_x
-                    self.arucoSample_y += self.aruco_y
-                    self.arucoCount += 1
+        #     #UTILIZE RUNNING AVERAGE LATER ON
+        #         while self.arucoCount != 20:
+        #             self.arucoSample_x += self.aruco_x
+        #             self.arucoSample_y += self.aruco_y
+        #             self.arucoCount += 1
 
-                self.new_aruco_x = self.arucoSample_x/20.0
-                self.new_aruco_y = self.arucoSample_y/20.0
+        #         self.new_aruco_x = self.arucoSample_x/20.0
+        #         self.new_aruco_y = self.arucoSample_y/20.0
 
             
                     
 
-            print(self.arucoFound)
-            print(self.nav_state)
-            print("EXECUTE")
+        #     print(self.arucoFound)
+        #     print(self.nav_state)
+        #     print("EXECUTE")
             
-        elif self.setpointChecker() == True and self.current_setpoint_index == 2:
-            self.arucoFlag = True
+        # elif self.setpointChecker() == True and self.current_setpoint_index == 2:
+        #     self.arucoFlag = True
 
-            # self.arucoSample_x = self.aruco_x
-            # self.arucoSample_y = self.aruco_y
+        #     # self.arucoSample_x = self.aruco_x
+        #     # self.arucoSample_y = self.aruco_y
 
-            aruco_z = self.curr_z
-            aruco_z += 0.05
+        #     aruco_z = self.curr_z
+        #     aruco_z += 0.05
 
-            self.aruco_setpoint = [self.new_aruco_x, (self.new_aruco_y * -1), aruco_z, self.home_yaw]
+        #     self.aruco_setpoint = [self.new_aruco_x, (self.new_aruco_y * -1), aruco_z, self.home_yaw]
 
 
 
@@ -333,10 +339,10 @@ class OffboardControl(Node):
             #     self.land()
         
                     
-            print(self.aruco_setpoint)
+            # print(self.aruco_setpoint)
 
-            if (self.home_z + 0.05) > self.curr_z > (self.home_z - 0.05) and self.arucoFlag == True:
-                self.land()
+            # if (self.home_z + 0.05) > self.curr_z > (self.home_z - 0.05) and self.arucoFlag == True:
+            #     self.land()
 
 
 
