@@ -207,7 +207,7 @@ class OffboardControl(Node):
         
 
 
-        self.states=['IDLE', 'FAILSAFE', 'ARM', 'DISARM', 'TAKEOFF', 'LOITER', 'SEARCH', 'SCAN','APPROACH', 'FINAPP', 'LAND']
+        self.states=['IDLE', 'FAILSAFE', 'ARM', 'DISARM', 'TAKEOFF', 'LOITER', 'SEARCH', 'SCAN','APPROACH', 'FINAPP', 'LAND', 'MAN_OVERRIDE']
         
         self.droneState = DroneState()
         self.machine = Machine(model=self.droneState , states=self.states, initial= 'IDLE')
@@ -219,7 +219,7 @@ class OffboardControl(Node):
 
         #Need to ensure that if this state transition occurs, some sort of clean up like go back into manual mode or pos mode and restart back to Arm or Idle depending on conds.
         self.machine.add_transition('trs_next', 'TAKEOFF', 'FAILSAFE', conditions = lambda: self.failsafe_state == True)
-        self.machine.add_transition('trs_next', 'FAILSAFE', 'FAILSAFE')
+        #self.machine.add_transition('trs_next', 'FAILSAFE', 'FAILSAFE')
         self.machine.add_transition('trs_next', 'TAKEOFF', 'LOITER', conditions=['setpoint_check'])
         self.machine.add_transition('trs_next', 'LOITER', 'SEARCH', conditions=['setpoint_check'])
         self.machine.add_transition('trs_next', 'SEARCH', 'SCAN', conditions=['setpoint_check', 'attitude_check'])
@@ -234,7 +234,11 @@ class OffboardControl(Node):
         self.machine.add_transition('trs_next', 'FINAPP', 'LAND', prepare=['set_final_setpoint'], conditions=['setpoint_check', 'attitude_check'])
         self.machine.add_transition('trs_next', 'LAND', 'DISARM', conditions=['landing_check'])
         self.machine.add_transition('trs_next', 'DISARM', 'IDLE', conditions = lambda: self.arm_state == VehicleStatus.ARMING_STATE_STANDBY)
-
+        
+        #Don't want to transition to MAN_OVERRIDE in IDLE or during ARM. So maybe don't use a wild card here?
+        #self.machine.add_transition('trs_next', '*', 'MAN_OVERRIDE', conditions = lambda: self.nav_state == VehicleStatus.NAVIGATION_STATE_POSCTL)
+        self.machine.add_transition('trs_next', ['FAILSAFE', 'TAKEOFF', 'LOITER', 'SEARCH', 'SCAN','APPROACH', 'FINAPP', 'LAND'], 'MAN_OVERRIDE', conditions = lambda: self.nav_state == VehicleStatus.NAVIGATION_STATE_POSCTL)
+        self.machine.add_transition('trs_next', 'MAN_OVERRIDE', 'MAN_OVERRIDE')
 
 
         #self.machine.add_transition('trs_next', 'LAND', 'IDLE', conditions=['test'])

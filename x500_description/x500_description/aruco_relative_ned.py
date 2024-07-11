@@ -17,13 +17,6 @@ class ArucoPoseNEDBaseLink(Node):
 
     def __init__(self):
         super().__init__('aruco_tf2_pose_ned_publisher')
-
-        qos_profile = QoSProfile(
-            reliability=QoSReliabilityPolicy.RMW_QOS_POLICY_RELIABILITY_BEST_EFFORT,
-            durability=QoSDurabilityPolicy.RMW_QOS_POLICY_DURABILITY_TRANSIENT_LOCAL,
-            history=QoSHistoryPolicy.RMW_QOS_POLICY_HISTORY_KEEP_LAST,
-            depth=1
-        )
         
         # # Declare and acquire `target_frame` parameter
         # self.target_frame = self.declare_parameter(
@@ -35,7 +28,7 @@ class ArucoPoseNEDBaseLink(Node):
         self.tf_listener = TransformListener(self.tf_buffer, self)
 
         # Create pose publisher
-        self.publisher = self.create_publisher(Pose, '/aruco_ned', qos_profile)
+        self.publisher = self.create_publisher(Pose, '/aruco_ned', 10)
         
         self.aruco_poses_subscriber = self.create_subscription(PoseArray, 'aruco_poses', self.aruco_poses_callback, 10)
 
