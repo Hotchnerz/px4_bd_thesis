@@ -53,7 +53,7 @@ class DroneState():
 
     def on_exit_LOITER(self, *args):
         #self.update_setpoint([1.5,0,self.flight_height,0])
-        self.update_setpoint([1.35,0,self.flight_height,0])
+        self.update_setpoint([1.20,0,self.flight_height,0])
         print("Sending Search Setpoint")
     
     # def on_enter_APPROACH(self, *args):
@@ -133,7 +133,7 @@ class DroneState():
         print("Sending Takeoff Setpoint")
     
     def set_approach_setpoint(self):
-        self.update_setpoint([np.median(self.x_app_setpoint_app),(np.median(self.y_app_setpoint_app))*-1, self.flight_height,OffboardControl.marker_pos[3]])
+        self.update_setpoint([np.mean(self.x_app_setpoint_app),(np.mean(self.y_app_setpoint_app))*-1, self.flight_height,OffboardControl.marker_pos[3]])
         #self.update_setpoint([1.25944,0.0202361,-1.25,OffboardControl.marker_pos[3]])
         print("Approaching Marker")
     
