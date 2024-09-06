@@ -237,7 +237,7 @@ class OffboardControl(Node):
         
         #Don't want to transition to MAN_OVERRIDE in IDLE or during ARM. So maybe don't use a wild card here?
         #self.machine.add_transition('trs_next', '*', 'MAN_OVERRIDE', conditions = lambda: self.nav_state == VehicleStatus.NAVIGATION_STATE_POSCTL)
-        self.machine.add_transition('trs_next', ['FAILSAFE', 'TAKEOFF', 'LOITER', 'SEARCH', 'SCAN','APPROACH', 'FINAPP', 'LAND'], 'MAN_OVERRIDE', conditions = lambda: self.nav_state == VehicleStatus.NAVIGATION_STATE_POSCTL)
+        self.machine.add_transition('trs_next', ['FAILSAFE', 'TAKEOFF', 'LOITER', 'SEARCH', 'SCAN','APPROACH', 'FINAPP', 'LAND'], 'MAN_OVERRIDE', conditions = lambda: self.nav_state == VehicleStatus.NAVIGATION_STATE_POSCTL or self.nav_state == VehicleStatus.NAVIGATION_STATE_MANUAL)
         self.machine.add_transition('trs_next', 'MAN_OVERRIDE', 'MAN_OVERRIDE')
 
 
