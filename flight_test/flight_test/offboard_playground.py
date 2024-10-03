@@ -185,16 +185,16 @@ class OffboardControl(Node):
         )
         
         #Publishers
-        self.trajectory_pub = self.create_publisher(TrajectorySetpoint, '/fmu/trajectory_setpoint/in', qos_profile)
-        self.offboard_control_mode_pub = self.create_publisher(OffboardControlMode, 'fmu/offboard_control_mode/in', qos_profile)
-        self.vehicle_cmd_pub = self.create_publisher(VehicleCommand, '/fmu/vehicle_command/in', qos_profile)
+        self.trajectory_pub = self.create_publisher(TrajectorySetpoint, '/fmu/in/trajectory_setpoint', qos_profile)
+        self.offboard_control_mode_pub = self.create_publisher(OffboardControlMode, '/fmu/in/offboard_control_mode', qos_profile)
+        self.vehicle_cmd_pub = self.create_publisher(VehicleCommand, '/fmu/in/vehicle_command', qos_profile)
 
 
         #Subscribers
-        self.drone_status_sub = self.create_subscription(VehicleStatus, '/fmu/vehicle_status/out', self.vehicle_status_callback, qos_profile)
-        self.localpos_subscriber = self.create_subscription(VehicleLocalPosition, '/fmu/vehicle_local_position/out', self.localpos_callback, qos_profile)
-        self.vehicle_att_subscriber = self.create_subscription(VehicleAttitude, '/fmu/vehicle_attitude/out', self.vehicle_att_callback, qos_profile)
-        self.vehicle_att_set_subscriber = self.create_subscription(VehicleAttitudeSetpoint, '/fmu/vehicle_attitude_setpoint/out', self.vehicle_att_set_callback, qos_profile)
+        self.drone_status_sub = self.create_subscription(VehicleStatus, '/fmu/out/vehicle_status', self.vehicle_status_callback, qos_profile)
+        self.localpos_subscriber = self.create_subscription(VehicleLocalPosition, '/fmu/out/vehicle_local_position', self.localpos_callback, qos_profile)
+        self.vehicle_att_subscriber = self.create_subscription(VehicleAttitude, '/fmu/out/vehicle_attitude', self.vehicle_att_callback, qos_profile)
+        self.vehicle_att_set_subscriber = self.create_subscription(VehicleAttitudeSetpoint, '/fmu/out/vehicle_attitude_setpoint', self.vehicle_att_set_callback, qos_profile)
         self.aruco_subscriber = self.create_subscription(ArucoMarkers, '/aruco_markers', self.aruco_callback, 10)
         self.aruco_baselink_subscriber = self.create_subscription(Pose, '/aruco_baselink', self.aruco_baselink_callback, 10)
 
