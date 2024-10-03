@@ -25,8 +25,8 @@ class MapFramePublisher(Node):
         self.tf_broadcaster = TransformBroadcaster(self)
 
         #Subscriber
-        self.vehicleAttitude_subscription = self.create_subscription(VehicleAttitude, 'fmu/vehicle_attitude/out', self.vehicleAttiude_callback, qos_profile)
-        self.vehicleLocalPosition_subscription = self.create_subscription(VehicleLocalPosition, 'fmu/vehicle_local_position/out', self.vehicleLocalPosiiton_callback, qos_profile)
+        self.vehicleAttitude_subscription = self.create_subscription(VehicleAttitude, 'fmu/out/vehicle_attitude', self.vehicleAttiude_callback, qos_profile)
+        self.vehicleLocalPosition_subscription = self.create_subscription(VehicleLocalPosition, 'fmu/out/vehicle_local_position', self.vehicleLocalPosiiton_callback, qos_profile)
         #self.subscription = self.create_subscription(VehicleOdometry, 'fmu/vehicle_odometry/out', self.odom_callback, 10)
         #self.subscription  # prevent unused variable warning
         self.vehicleAttitude_subscription  # prevent unused variable warning
