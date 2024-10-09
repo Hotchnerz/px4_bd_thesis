@@ -7,7 +7,7 @@ from rclpy.clock import Clock
 from tf_transformations import euler_from_quaternion
 from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy, QoSDurabilityPolicy
 
-from px4_msgs.msg import OffboardControlMode, TrajectorySetpoint, VehicleStatus, VehicleCommand, Timesync, VehicleLocalPosition, VehicleLocalPositionSetpoint, VehicleAttitude, VehicleAttitudeSetpoint
+from px4_msgs.msg import OffboardControlMode, TrajectorySetpoint, VehicleStatus, VehicleCommand, VehicleLocalPosition, VehicleLocalPositionSetpoint, VehicleAttitude, VehicleAttitudeSetpoint
 from ros2_aruco_interfaces.msg import ArucoMarkers
 
 class DroneState():
@@ -262,9 +262,9 @@ class OffboardControl(Node):
 
     
     def localpos_callback(self, msg):
-        self.curr_pos[0] = msg.x
-        self.curr_pos[1] = msg.y
-        self.curr_pos[2] = msg.z
+        self.curr_pos[0] = msg.position[0]
+        self.curr_pos[1] = msg.position[0]
+        self.curr_pos[2] = msg.position[0]
 
         self.curr_vel[0] = msg.vx
         self.curr_vel[1] = msg.vy
