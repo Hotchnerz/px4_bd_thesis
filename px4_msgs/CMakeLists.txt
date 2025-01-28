@@ -20,14 +20,12 @@ find_package(rosidl_default_generators REQUIRED)
 set(MSGS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/msg")
 file(GLOB PX4_MSGS RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}" "${MSGS_DIR}/*.msg")
 
-# get all srv files
-set(SRVS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/srv")
-file(GLOB PX4_SRVS RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}" "${SRVS_DIR}/*.srv")
+file(GLOB ROS_MSG_DIR_LIST "${MSGS_DIR}/*.msg")
+
+set(ROS_MSG_DIR_LIST "${ROS_MSG_DIR_LIST}" CACHE INTERNAL "ROS_MSG_DIR_LIST")
 
 # Generate introspection typesupport for C and C++ and IDL files
-rosidl_generate_interfaces(${PROJECT_NAME}
-	${PX4_MSGS}
-	${PX4_SRVS}
+rosidl_generate_interfaces(${PROJECT_NAME} ${PX4_MSGS}
 	DEPENDENCIES builtin_interfaces
 	ADD_LINTER_TESTS
 )

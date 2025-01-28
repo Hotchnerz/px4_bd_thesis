@@ -24,7 +24,6 @@ find_package(geometry_msgs REQUIRED)
 find_package(px4_msgs REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(sensor_msgs REQUIRED)
-find_package(rclpy REQUIRED)
 
 #################
 # Setup targets #
@@ -60,11 +59,6 @@ install(TARGETS debug_vect_advertiser DESTINATION lib/${PROJECT_NAME})
 add_executable(offboard_control src/examples/offboard/offboard_control.cpp)
 ament_target_dependencies(offboard_control rclcpp px4_msgs)
 install(TARGETS offboard_control DESTINATION lib/${PROJECT_NAME})
-
-# examples/offboard/offboard_control_srv
-add_executable(offboard_control_srv src/examples/offboard/offboard_control_srv.cpp)
-ament_target_dependencies(offboard_control_srv rclcpp px4_msgs)
-install(TARGETS offboard_control_srv DESTINATION lib/${PROJECT_NAME})
 
 
 ############
@@ -111,18 +105,5 @@ if(BUILD_TESTING)
 	#set(ament_cmake_cpplint_FOUND TRUE)
 	ament_lint_auto_find_test_dependencies()
 endif()
-
-###########
-# Python ##
-###########
-
-# Install Python modules
-ament_python_install_package(${PROJECT_NAME})
-
-# Install Python executables
-install(PROGRAMS
-  src/examples/offboard_py/offboard_control.py
-  DESTINATION lib/${PROJECT_NAME}
-)
 
 ament_package()
