@@ -23,7 +23,9 @@ from px4_msgs.msg import (
     VehicleAttitude,
     VehicleAttitudeSetpoint,
 )
+
 from ros2_aruco_interfaces.msg import ArucoMarkers
+from fg40_interfaces.msg import FG40Feedback, FG40MagnetCmd
 
 
 class DroneState:
@@ -258,6 +260,9 @@ class OffboardControl(Node):
         )
 
         # Publishers
+        self.magnet_cmd_pub = self.create_publisher(
+            FG40MagnetCmd, "/fg40_cmd", 10
+        )
         self.trajectory_pub = self.create_publisher(
             TrajectorySetpoint, "/fmu/in/trajectory_setpoint", qos_profile
         )
@@ -269,6 +274,9 @@ class OffboardControl(Node):
         )
 
         # Subscribers
+        self.fg40_status_sub = self.create_subscription(
+            FG40Feedback, "/fg40_status", self.fg40_status_callback, 10
+        )
         self.drone_status_sub = self.create_subscription(
             VehicleStatus,
             "/fmu/out/vehicle_status",
@@ -538,6 +546,9 @@ class OffboardControl(Node):
                 OffboardControl.marker_pos_x.append(msg.position.x)
                 OffboardControl.marker_pos_y.append(msg.position.y)
 
+    def fg40_status_callback(self):
+        pass
+
     # def arm(self):
     #     self.publish_vehicle_command(VehicleCommand.VEHICLE_CMD_COMPONENT_ARM_DISARM, 1.0)
     #     self.get_logger().info('Arm command sent')
@@ -692,8 +703,22 @@ class OffboardControl(Node):
             msg.yaw = self.home_pos[3]
             self.trajectory_pub.publish(msg)
 
+    def magnet_publisher(self, cmd):
+        msg = FG40MagnetCmd()
+
+        if cmd == "magnetize" or cmd == "mag" or cmd == "m":
+            msg.cmd_magnet = 1
+            self.magnet_cmd_pub.publish(msg)
+        elif cmd == "force_magnetize" or cmd == "forcemag" or cmd == "fm":
+            msg.cmd_magnet = 2
+            self.magnet_cmd_pub.publish(msg)
+        elif cmd == "demagnetize" or cmd == "demag" or cmd == "dm":
+            msg.cmd_magnet = 0
+            self.magnet_cmd_pub.publish(msg)
+
     def state_callback(self):
         print(self.droneState.state)
+        self.magnet_publisher("dm")
         # if self.droneState.state == 'SCAN':
         # print("Aruco Found: ", OffboardControl.aruco_found)
         # print("Scan Done: ", len(OffboardControl.marker_pos_x) == 20) and (len(OffboardControl.marker_pos_y) == 20)
