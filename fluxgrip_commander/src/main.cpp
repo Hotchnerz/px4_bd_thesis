@@ -112,22 +112,20 @@ void timer_callback(rcl_timer_t * timer, int64_t last_call_time)
 {  
   RCLC_UNUSED(last_call_time);
   if (timer != NULL) {
+    RCSOFTCHECK(rcl_publish(&publisher, &feedback_msg, NULL));
 
-    //if ((feedback_msg.magnetized != feedback_prev.magnetized) && (feedback_msg.cycles_on_off[0] != feedback_prev.cycles_on_off[0]) && (feedback_msg.cycles_on_off[1] != feedback_prev.cycles_on_off[1])){
-      if ((feedback_prev.magnetized != feedback_msg.magnetized) && ((feedback_prev.cycles_on_off[0] != feedback_msg.cycles_on_off[0]) || ( feedback_prev.cycles_on_off[1] != feedback_msg.cycles_on_off[1]))){
+    //If the FG40's last state was active but lost power, publish a force mag cyphal message to resync the state to this node. Otherwise, ignore.
+    if ((feedback_prev.magnetized != feedback_msg.magnetized) && ((feedback_prev.cycles_on_off[0] != feedback_msg.cycles_on_off[0]) || ( feedback_prev.cycles_on_off[1] != feedback_msg.cycles_on_off[1]))){
       uavcan::primitive::scalar::Integer8_1_0 cyphal_msg;
       cyphal_msg.value = 2;
       cyphal_cmd_pub->publish(cyphal_msg);
     }
 
+    //Update previous message state
     feedback_prev.magnetized = feedback_msg.magnetized;
     feedback_prev.remagnetization_state = feedback_msg.remagnetization_state;
     feedback_prev.cycles_on_off[0] = feedback_msg.cycles_on_off[0];
     feedback_prev.cycles_on_off[1] = feedback_msg.cycles_on_off[1];
-
-    RCSOFTCHECK(rcl_publish(&publisher, &feedback_msg, NULL));
-
-
 
   }
 }
@@ -188,11 +186,11 @@ void setup() {
     /* cyphal.node.Version.1.0 software_version */
     0, 1,
     /* saturated uint64 software_vcs_revision_id */
-#ifdef CYPHAL_NODE_INFO_GIT_VERSION
-    CYPHAL_NODE_INFO_GIT_VERSION,
-#else
-    0,
-#endif
+    #ifdef CYPHAL_NODE_INFO_GIT_VERSION
+        CYPHAL_NODE_INFO_GIT_VERSION,
+    #else
+        0,
+    #endif
     /* saturated uint8[16] unique_id */
     cyphal::support::UniqueId::instance().value(),
     /* saturated uint8[<=50] name */
