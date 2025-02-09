@@ -16,6 +16,8 @@
 #include <107-Arduino-CriticalSection.h>
 #include <107-Arduino-Cyphal-Support.h>
 
+#include <queue>
+
 rcl_subscription_t subscriber;
 rcl_publisher_t publisher;
 fg40_interfaces__msg__FG40MagnetCmd magnet_cmd_msg;
@@ -27,7 +29,6 @@ rcl_allocator_t allocator;
 rcl_node_t node;
 rcl_timer_t timer;
 
-#define LED_PIN 13
 
 #define RCCHECK(fn) { rcl_ret_t temp_rc = fn; if((temp_rc != RCL_RET_OK)){error_loop();}}
 #define RCSOFTCHECK(fn) { rcl_ret_t temp_rc = fn; if((temp_rc != RCL_RET_OK)){}}
@@ -36,34 +37,51 @@ static int const MKRCAN_MCP2515_CS_PIN  = D17;
 static int const MKRCAN_MCP2515_INT_PIN = D5;
 static SPISettings const MCP2515x_SPI_SETTING{10*1000*1000UL, MSBFIRST, SPI_MODE0};
 
+void onReceiveBufferFull    (CanardFrame const &);
+void onFeedback_0_1_Received(zubax::fluxgrip::Feedback_0_1 const & recieved_fg40_msg);
+
 ArduinoMCP2515 mcp2515([]()
                        {
-                         SPI.beginTransaction(MCP2515x_SPI_SETTING);
                          digitalWrite(MKRCAN_MCP2515_CS_PIN, LOW);
                        },
                        []()
                        {
                          digitalWrite(MKRCAN_MCP2515_CS_PIN, HIGH);
-                         SPI.endTransaction();
                        },
                        [](uint8_t const d) { return SPI.transfer(d); },
                        micros,
-                       nullptr,
+                       onReceiveBufferFull,
                        nullptr);
 
 cyphal::Node::Heap<cyphal::Node::DEFAULT_O1HEAP_SIZE> node_heap;
 cyphal::Node node_hdl(node_heap.data(), node_heap.size(), micros, [] (CanardFrame const & frame) { return mcp2515.transmit(frame); });
 
-CanardPortID const ANGLE_ID = 1000U;
-cyphal::Publisher<uavcan::primitive::scalar::Integer8_1_0> integer_pub = node_hdl.create_publisher<uavcan::primitive::scalar::Integer8_1_0>
-  (ANGLE_ID, 1*1000*1000UL /* = 1 sec in usecs. */);
+CanardPortID const CMD_PORT_ID = 1000U;
+cyphal::Publisher<uavcan::primitive::scalar::Integer8_1_0> cyphal_cmd_pub = node_hdl.create_publisher<uavcan::primitive::scalar::Integer8_1_0>
+  (CMD_PORT_ID, 1*1000*1000UL /* = 1 sec in usecs. */);
 
-cyphal::Publisher<uavcan::node::Heartbeat_1_0> heartbeat_pub = node_hdl.create_publisher<uavcan::node::Heartbeat_1_0>
+cyphal::Publisher<uavcan::node::Heartbeat_1_0> cyphal_heartbeat_pub = node_hdl.create_publisher<uavcan::node::Heartbeat_1_0>
   (1*1000*1000UL /* = 1 sec in usecs. */);
+
+static CanardPortID const FEEDBACK_PORT_ID   = 1001U;
+cyphal::Subscription cyphal_feedback_sub;
+
+void onReceiveBufferFull(CanardFrame const & frame)
+{
+  node_hdl.onCanFrameReceived(frame);
+}
+
+void onFeedback_0_1_Received(zubax::fluxgrip::Feedback_0_1 const & recieved_fg40_msg)
+{
+  feedback_msg.magnetized = recieved_fg40_msg.magnetized;
+  feedback_msg.remagnetization_state = recieved_fg40_msg.remagnetization_state;
+  feedback_msg.cycles_on_off[0] = recieved_fg40_msg.cycles_on_off[0];
+  feedback_msg.cycles_on_off[1] = recieved_fg40_msg.cycles_on_off[1];
+}
 
 void error_loop(){
   while(1){
-    digitalWrite(LED_PIN, !digitalRead(LED_PIN));
+    digitalWrite(LED_BUILTIN, !digitalRead(LED_BUILTIN));
     delay(100);
   }
 }
@@ -73,10 +91,10 @@ void timer_callback(rcl_timer_t * timer, int64_t last_call_time)
   RCLC_UNUSED(last_call_time);
   if (timer != NULL) {
     RCSOFTCHECK(rcl_publish(&publisher, &feedback_msg, NULL));
-    feedback_msg.magnetized = true;
-    feedback_msg.remagnetization_state = 0;
-    feedback_msg.cycles_on_off[0] = 1;
-    feedback_msg.cycles_on_off[1] = 0;
+    // feedback_msg.magnetized = true;
+    // feedback_msg.remagnetization_state = 0;
+    // feedback_msg.cycles_on_off[0] = 1;
+    // feedback_msg.cycles_on_off[1] = 0;
   }
 }
 
@@ -84,7 +102,7 @@ void timer_callback(rcl_timer_t * timer, int64_t last_call_time)
 void subscription_callback(const void * msgin)
 {  
   const fg40_interfaces__msg__FG40MagnetCmd * msg = (const fg40_interfaces__msg__FG40MagnetCmd *)msgin;
-  //digitalWrite(LED_PIN, (msg->cmd_magnet == 1) ? LOW : HIGH);  
+  //digitalWrite(LED_BUILTIN, (msg->cmd_magnet == 1) ? LOW : HIGH);  
 
   int cmd = msg->cmd_magnet;
   uavcan::primitive::scalar::Integer8_1_0 cyphal_msg;
@@ -94,25 +112,25 @@ void subscription_callback(const void * msgin)
     //Demagnetize FG40
     case 0:
     cyphal_msg.value = 0;
-    integer_pub->publish(cyphal_msg);
+    cyphal_cmd_pub->publish(cyphal_msg);
     break;
 
     //Magnetize FG40
     case 1:
     cyphal_msg.value = 1;
-    integer_pub->publish(cyphal_msg);
+    cyphal_cmd_pub->publish(cyphal_msg);
     break;
 
     //FORCE Magnetize/Demagnetize Cycle on FG40
     case 2:
     cyphal_msg.value = 2;
-    integer_pub->publish(cyphal_msg);
+    cyphal_cmd_pub->publish(cyphal_msg);
     break;
 
     //Ignore other INT values and replace with a magnetize cmd
     default:
     cyphal_msg.value = 1;
-    integer_pub->publish(cyphal_msg);
+    cyphal_cmd_pub->publish(cyphal_msg);
     break;
 
   }
@@ -120,7 +138,7 @@ void subscription_callback(const void * msgin)
 }
 
 void setup() {
-
+    Serial.begin(115200);
     static const auto node_info = node_hdl.create_node_info
   (
     /* cyphal.node.Version.1.0 protocol_version */
@@ -143,6 +161,7 @@ void setup() {
 
   /* Setup SPI access */
   SPI.begin();
+  SPI.beginTransaction(MCP2515x_SPI_SETTING);
   pinMode(MKRCAN_MCP2515_CS_PIN, OUTPUT);
   digitalWrite(MKRCAN_MCP2515_CS_PIN, HIGH);
 
@@ -155,10 +174,12 @@ void setup() {
   mcp2515.setBitRate(CanBitRate::BR_1000kBPS_8MHZ);
   mcp2515.setNormalMode();
 
+  cyphal_feedback_sub = node_hdl.create_subscription<zubax::fluxgrip::Feedback_0_1>(FEEDBACK_PORT_ID, onFeedback_0_1_Received);
+  delay(1000);
   set_microros_serial_transports(Serial);
   
-  pinMode(LED_PIN, OUTPUT);
-  digitalWrite(LED_PIN, HIGH);  
+  pinMode(LED_BUILTIN, OUTPUT);
+  digitalWrite(LED_BUILTIN, HIGH);  
   
   delay(2000);
 
@@ -185,7 +206,7 @@ void setup() {
     "fg40_status"));
 
   // create timer,
-  const unsigned int timer_timeout = 1000;
+  const unsigned int timer_timeout = 1300;
   RCCHECK(rclc_timer_init_default(
     &timer,
     &support,
@@ -206,6 +227,9 @@ void setup() {
 }
 
 void loop() {
+
+  // while(digitalRead(MKRCAN_MCP2515_INT_PIN) == LOW)
+  //   mcp2515.onExternalEventHandler();
 
   /* Process all pending OpenCyphal actions.
    */
@@ -229,12 +253,11 @@ void loop() {
     msg.mode.value = uavcan::node::Mode_1_0::OPERATIONAL;
     msg.vendor_specific_status_code = 0;
 
-    heartbeat_pub->publish(msg);
+    cyphal_heartbeat_pub->publish(msg);
   }
-
-
 
   delay(100);
   RCCHECK(rclc_executor_spin_some(&executor_pub, RCL_MS_TO_NS(100)));
   RCCHECK(rclc_executor_spin_some(&executor_sub, RCL_MS_TO_NS(100)));
 }
+
