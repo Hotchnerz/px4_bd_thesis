@@ -12,8 +12,7 @@ setup(
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
-        ('share/' + package_name, glob('launch/*.py')),
-        (os.path.join('share', package_name, 'launch'), glob('launch/*launch.py')),
+        (os.path.join('share', package_name, 'launch'), glob('launch/*_launch.py')),
   	('share/' + package_name+'/urdf/', glob('urdf/*')),
   	('share/' + package_name+'/rviz/', glob('rviz/*')),
   	('share/' + package_name+'/meshes/collision/', glob('meshes/collision/*')),
@@ -30,7 +29,8 @@ setup(
         'console_scripts': [
             'aruco_tf_broadcaster = x500_description.aruco_tf_broadcast:main',
             'map_tf_broadcaster = x500_description.map_tf_broadcast:main',
-            'aruco_transform = x500_description.aruco_transform:main'
+            'aruco_transform = x500_description.aruco_transform:main',
+            'aruco_transform_ned = x500_description.aruco_relative_ned:main'
         ],
     },
 )

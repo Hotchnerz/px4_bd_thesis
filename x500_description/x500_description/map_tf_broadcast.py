@@ -5,6 +5,7 @@ from rclpy.node import Node
 from tf2_ros import TransformBroadcaster
 from tf_transformations import quaternion_from_euler, quaternion_multiply
 import tf_transformations
+from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy, QoSDurabilityPolicy
 from px4_msgs.msg import VehicleOdometry, VehicleAttitude, VehicleLocalPosition
 from geometry_msgs.msg import TransformStamped
 
@@ -13,12 +14,19 @@ class MapFramePublisher(Node):
     def __init__(self):
         super().__init__('map_tf2__publisher')
 
+        qos_profile = QoSProfile(
+            reliability=QoSReliabilityPolicy.RMW_QOS_POLICY_RELIABILITY_BEST_EFFORT,
+            durability=QoSDurabilityPolicy.RMW_QOS_POLICY_DURABILITY_TRANSIENT_LOCAL,
+            history=QoSHistoryPolicy.RMW_QOS_POLICY_HISTORY_KEEP_LAST,
+            depth=1
+        )
+
         # Initialize the transform broadcaster
         self.tf_broadcaster = TransformBroadcaster(self)
 
         #Subscriber
-        self.vehicleAttitude_subscription = self.create_subscription(VehicleAttitude, 'fmu/vehicle_attitude/out', self.vehicleAttiude_callback, 10)
-        self.vehicleLocalPosition_subscription = self.create_subscription(VehicleLocalPosition, 'fmu/vehicle_local_position/out', self.vehicleLocalPosiiton_callback, 10)
+        self.vehicleAttitude_subscription = self.create_subscription(VehicleAttitude, '/fmu/out/vehicle_attitude', self.vehicleAttiude_callback, qos_profile)
+        self.vehicleLocalPosition_subscription = self.create_subscription(VehicleLocalPosition, '/fmu/out/vehicle_local_position', self.vehicleLocalPosiiton_callback, qos_profile)
         #self.subscription = self.create_subscription(VehicleOdometry, 'fmu/vehicle_odometry/out', self.odom_callback, 10)
         #self.subscription  # prevent unused variable warning
         self.vehicleAttitude_subscription  # prevent unused variable warning
@@ -26,9 +34,9 @@ class MapFramePublisher(Node):
 
         self.q = [1, 0, 0, 0]
 
+
     def vehicleAttiude_callback(self, msg):
         self.q = msg.q
-
 
 
     def vehicleLocalPosiiton_callback(self, msg):

@@ -54,7 +54,7 @@ class DroneState():
 
     def on_exit_LOITER(self, *args):
         #self.update_setpoint([1.5,0,self.flight_height,0])
-        self.update_setpoint([1.35,0,self.flight_height,0])
+        self.update_setpoint([0.5,-0.15,self.flight_height,0])
         print("Sending Search Setpoint")
 
     def on_exit_ARM(self, *args):
@@ -424,7 +424,6 @@ class OffboardControl(Node):
         
         #msg.x, msg.y, msg.z, msg.yaw = setpoint[index]
         
-        
         if self.droneState.state == 'IDLE' or self.droneState.state == 'TAKEOFF' or self.droneState.state == 'ARM':
             msg.x, msg.y, msg.z= setpoint[0], setpoint[1], setpoint[2]
             self.trajectory_pub.publish(msg)
@@ -436,8 +435,16 @@ class OffboardControl(Node):
             msg.vz = 0.1
             self.trajectory_pub.publish(msg)           
         else:
+            #Traj. Planner
+
+
+
+
+
+            #Position P controller - Z-axis
             self.vel_sp_pos = (setpoint[2] - self.curr_pos[2]) * self.mpc_kp_z
 
+            # Contstrain calculated velocities
             if self.vel_sp_pos < (self.mpc_vel_limit_up * -1):
                 self.vel_sp_pos = (self.mpc_vel_limit_up * -1)
             
@@ -472,7 +479,7 @@ class OffboardControl(Node):
 
     # #Where I want state changes to occur
     def cmdloop_callback(self):
-        if self.droneState.state != 'MAN_OVERRIDE' or self.droneState.state != 'FAILSAFE':
+        if self.droneState.state != 'MAN_OVERRIDE' and self.droneState.state != 'FAILSAFE':
             self.publish_offboard_heartbeat()
             self.trajectory_setpoint_publisher(self.setpoints)
 

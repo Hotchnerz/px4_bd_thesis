@@ -36,6 +36,12 @@ def generate_launch_description():
         )
     )
 
+    micro_ros_node = Node(
+        package="micro_ros_agent",
+        executable="micro_ros_agent",
+	name="micro_ros_agent",
+	arguments=["serial", "--dev", "/dev/ttyACM0", "-b", "115200"]
+    )
     map_node = Node(
         package="x500_description",
         executable="map_tf_broadcaster"
@@ -48,7 +54,7 @@ def generate_launch_description():
         package="x500_description",
         executable="aruco_transform"
     )
-    
+
     ld.add_action(image_proc)
     ld.add_action(usb_cam_launch)
     ld.add_action(gazebo_aruco_node)
@@ -56,4 +62,5 @@ def generate_launch_description():
     ld.add_action(map_node)
     ld.add_action(aruco_tf_node)
     ld.add_action(aruco_baselink)
+    ld.add_action(micro_ros_node)
     return ld
