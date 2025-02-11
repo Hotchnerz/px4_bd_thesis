@@ -48,18 +48,18 @@ class CameraConfig(BaseModel):
             raise FileNotFoundError(f'Could not find parameter file: {value}')
         return value
 
-    @root_validator
-    def validate_root(cls, values):
-        name = values.get('name')
-        remappings = values.get('remappings')
-        if name and not remappings:
+   # @root_validator
+   # def validate_root(cls, values):
+       # name = values.get('name')
+       # remappings = values.get('remappings')
+       # if name and not remappings:
             # Automatically set remappings if name is set
-            remappings = [
-                ('image_raw', f'{name}/image_raw'),
-                ('image_raw/compressed', f'{name}/image_compressed'),
-                ('image_raw/compressedDepth', f'{name}/compressedDepth'),
-                ('image_raw/theora', f'{name}/image_raw/theora'),
-                ('camera_info', f'{name}/camera_info'),
-            ]
-        values['remappings'] = remappings
-        return values
+           # remappings = [
+               # ('image_raw', f'{name}/image_raw'),
+               # ('image_raw/compressed', f'{name}/image_compressed'),
+               # ('image_raw/compressedDepth', f'{name}/compressedDepth'),
+               # ('image_raw/theora', f'{name}/image_raw/theora'),
+               # ('camera_info', f'{name}/camera_info'),
+           # ]
+       # values['remappings'] = remappings
+       # return values

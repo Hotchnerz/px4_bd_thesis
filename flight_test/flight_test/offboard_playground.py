@@ -73,7 +73,7 @@ class DroneState:
 
     def on_exit_LOITER(self, *args):
         # self.update_setpoint([1.5,0,self.flight_height,0])
-        self.update_setpoint([2.00, 0, self.flight_height, 0])
+        self.update_setpoint([1.5, 0, self.flight_height, 0])
         print("Sending Search Setpoint")
 
     # def on_enter_APPROACH(self, *args):
