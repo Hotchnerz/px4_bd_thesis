@@ -22,6 +22,7 @@ from px4_msgs.msg import (
     VehicleLocalPositionSetpoint,
     VehicleAttitude,
     VehicleAttitudeSetpoint,
+    VehicleLandDetected,
 )
 
 from ros2_aruco_interfaces.msg import ArucoMarkers
@@ -40,6 +41,8 @@ class DroneState:
         self.y_app_setpoint_app = []
         self.x_offset = -0.326
         self.y_offset = 0.0
+        self.scan_attempt = 0
+        self.marker_detect_attempt = 0
 
     def test(self):
         # print(OffboardControl.curr_pos)
@@ -70,7 +73,7 @@ class DroneState:
 
     def on_exit_LOITER(self, *args):
         # self.update_setpoint([1.5,0,self.flight_height,0])
-        self.update_setpoint([1.35, 0, self.flight_height, 0])
+        self.update_setpoint([2.00, 0, self.flight_height, 0])
         print("Sending Search Setpoint")
 
     # def on_enter_APPROACH(self, *args):
@@ -87,8 +90,18 @@ class DroneState:
         OffboardControl.marker_pos_x.clear()
         OffboardControl.marker_pos_y.clear()
 
+    def on_exit_LAND(self, *args):
+        # OffboardControl.magnet_publisher("mag")
+        pass
+
     def marker_found(self):
         print("Marker Found:" + str(OffboardControl.aruco_found))
+        if (
+            not OffboardControl.aruco_found
+            and not OffboardControl.first_aruco_msg
+        ):
+            self.marker_detect_attempt = self.marker_detect_attempt + 1
+
         return OffboardControl.aruco_found and OffboardControl.first_aruco_msg
 
     def distance_check(self):
@@ -115,6 +128,16 @@ class DroneState:
             )
         ) > 0.3
         # return (np.sqrt(np.square(OffboardControl.curr_pos[0] - 1.25944) + np.square(OffboardControl.curr_pos[1] - 0.0202361))) > 0.05
+
+    def attempt_check(self):
+        # print(f"Scan Attempt: {self.scan_attempt} | ")
+        # print(f"Marker Detect Attempt: {self.marker_detect_attempt}")
+        self.scan_check()
+        self.marker_found()
+
+        if self.scan_attempt >= 25 and self.marker_detect_attempt >= 25:
+            return True
+        return False
 
     def setpoint_check(self):
         # Check odom if x500 has reached the setpoint
@@ -163,7 +186,7 @@ class DroneState:
         # Simple Moving Average
         window = 10
 
-        if self.reset_moving_avg == False:
+        if not self.reset_moving_avg:
             self.x_setpoints = np.array(OffboardControl.marker_pos_x)
             self.y_setpoints = np.array(OffboardControl.marker_pos_y)
             self.reset_moving_avg = True
@@ -182,7 +205,7 @@ class DroneState:
         ):
             self.x_app_setpoint_app, self.y_app_setpoint_app = self.moving_avg()
             return True
-
+        self.scan_attempt += 1
         return False
 
     def set_takeoff_setpoint(self):
@@ -217,6 +240,7 @@ class DroneState:
 
         drone_land = False
         self.new_z += 0.04
+        # if OffboardControl.droneState.state != "ABORT":
         self.update_setpoint(
             [
                 self.final_setpoint[0],
@@ -227,7 +251,12 @@ class DroneState:
         )
         # self.update_setpoint([1.25944,0.0202361, new_z, OffboardControl.marker_pos[3]])
         # return drone_land
-        if OffboardControl.curr_thrust >= -0.64:
+        if (
+            OffboardControl.curr_thrust >= -0.64
+            and OffboardControl.close_to_ground
+            and OffboardControl.has_low_throttle
+            # and OffboardControl.in_descend
+        ):
             drone_land = True
 
         return drone_land
@@ -247,6 +276,9 @@ class OffboardControl(Node):
 
     rpy = (0, 0, 0)
     curr_thrust = 0
+    close_to_ground = False
+    has_low_throttle = False
+    in_descend = False
     aruco_found = False
     first_aruco_msg = False
 
@@ -301,6 +333,12 @@ class OffboardControl(Node):
             self.vehicle_att_set_callback,
             qos_profile,
         )
+        self.vehicle_land_det_subscriber = self.create_subscription(
+            VehicleLandDetected,
+            "/fmu/out/vehicle_land_detected",
+            self.vehicle_land_det_callback,
+            qos_profile,
+        )
         self.aruco_subscriber = self.create_subscription(
             ArucoMarkers, "/aruco_markers", self.aruco_callback, 10
         )
@@ -334,6 +372,7 @@ class OffboardControl(Node):
             "APPROACH",
             "FINAPP",
             "LAND",
+            "ABORT",
             "MAN_OVERRIDE",
         ]
 
@@ -371,7 +410,7 @@ class OffboardControl(Node):
             "trs_next",
             "TAKEOFF",
             "FAILSAFE",
-            conditions=lambda: self.failsafe_state == True,
+            conditions=lambda: self.failsafe_state,
         )
         # self.machine.add_transition('trs_next', 'FAILSAFE', 'FAILSAFE')
         self.machine.add_transition(
@@ -400,6 +439,23 @@ class OffboardControl(Node):
             "trs_next",
             "APPROACH",
             "SCAN",
+            conditions=["setpoint_check", "attitude_check"],
+        )
+
+        # Abort landing manuver if fiducial is not found > 3 times
+        self.machine.add_transition(
+            "trs_next",
+            ["SCAN", "FINAPP"],
+            "ABORT",
+            # If the scan failed but you are at the setpoint sent to
+            conditions=["attempt_check", "setpoint_check", "attitude_check"],
+            # unless=["scan_check", "marker_found"],
+        )
+
+        self.machine.add_transition(
+            "trs_next",
+            "ABORT",
+            "LAND",
             conditions=["setpoint_check", "attitude_check"],
         )
 
@@ -481,7 +537,7 @@ class OffboardControl(Node):
 
         self.timestamp = msg.timestamp
 
-        if self.homeSetPos == False:
+        if not self.homeSetPos:
             self.home_pos[0] = self.curr_pos[0]
             self.home_pos[1] = self.curr_pos[1]
             self.home_pos[2] = self.curr_pos[2]
@@ -494,38 +550,42 @@ class OffboardControl(Node):
         OffboardControl.rpy = euler_from_quaternion(q)
 
         self.curr_yaw = OffboardControl.rpy[2]
-        if self.homeSetYaw == False:
+        if not self.homeSetYaw:
             self.home_pos[3] = self.curr_yaw
             self.homeSetYaw = True
 
     def vehicle_att_set_callback(self, msg):
         OffboardControl.curr_thrust = msg.thrust_body[2]
 
+    def vehicle_land_det_callback(self, msg):
+        OffboardControl.close_to_ground = msg.close_to_ground_or_skipped_check
+        OffboardControl.has_low_throttle = msg.has_low_throttle
+        # OffboardControl.in_descend = msg.in_descend
+
     # NEED TO WORK ON THIS
     def aruco_callback(self, msg):
         self.arucoID = int(msg.marker_ids[0])
-        if self.arucoID == 122:
+        if self.arucoID == 122 and self.droneState.state == "SCAN":
             OffboardControl.aruco_found = True
         else:
             OffboardControl.aruco_found = False
         # print(self.arucoID)
 
     def aruco_baselink_callback(self, msg):
-        if not OffboardControl.first_aruco_msg:
-            OffboardControl.first_aruco_msg = True
-
-        q = [
-            msg.orientation.x,
-            msg.orientation.y,
-            msg.orientation.z,
-            msg.orientation.w,
-        ]
-
-        aruco_rpy = euler_from_quaternion(q)
-        self.marker_pos[3] = aruco_rpy[2]
-
         # Need a check to ensure that this a new Scan state entrance
         if self.droneState.state == "SCAN":
+            if not OffboardControl.first_aruco_msg and self.aruco_found:
+                OffboardControl.first_aruco_msg = True
+
+            q = [
+                msg.orientation.x,
+                msg.orientation.y,
+                msg.orientation.z,
+                msg.orientation.w,
+            ]
+
+            aruco_rpy = euler_from_quaternion(q)
+            self.marker_pos[3] = aruco_rpy[2]
 
             # Want to remove this later...
             self.marker_pos[0] = msg.position.x
@@ -591,7 +651,7 @@ class OffboardControl(Node):
     def publish_offboard_heartbeat(self):
         msg = OffboardControlMode()
         msg.position = True
-        msg.velocity = True
+        msg.velocity = False
         msg.acceleration = False
         msg.attitude = False
         msg.body_rate = False
@@ -616,92 +676,90 @@ class OffboardControl(Node):
 
     def trajectory_setpoint_publisher(self, setpoint):
         msg = TrajectorySetpoint()
-        # msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
-        #
-        # msg.position[0] = 0.0
-        # msg.position[1] = 0.0
-        # msg.position[2] = -1.5
-
-        # msg.velocity[0] = np.nan
-        # msg.velocity[1] = np.nan
-        #
-        # if self.curr_pos[2] <= -5.0:
-        #     msg.velocity[2] = 0.0
-        #     msg.position[0] = 1.0
-        #     msg.position[1] = 0.0
-        #     msg.position[2] = np.nan
-        # else:
-        #     msg.position[0] = 0.0
-        #     msg.position[1] = 0.0
-        #     msg.position[2] = np.nan
-        #     msg.velocity[2] = -0.5
-        # msg.position = [1.0, 0.0, -1.5]
-        # msg.yaw = 0.0
-        # # msg.timestamp = self.timestamp
         msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
+
+        msg.position[0], msg.position[1], msg.position[2] = (
+            setpoint[0],
+            setpoint[1],
+            setpoint[2],
+        )
+        # vel_x = (setpoint[0] - self.curr_pos[0]) / 2
+        # vel_y = (setpoint[1] - self.curr_pos[1]) / 2
+        # vel_z = (setpoint[2] - self.curr_pos[2]) / 2
+        # vel_x = 0.6
+        # vel_y = 0.6
+        # vel_z = 0.6
+        # msg.vx, msg.vy, msg.vz = vel_x, vel_y, vel_z
+        self.trajectory_pub.publish(msg)
         # self.trajectory_pub.publish(msg)
         # est_height = self.calculate_height()
         # self.get_logger().info(f"Est. Height: {est_height}")
 
         # msg.x, msg.y, msg.z, msg.yaw = setpoint[index]
 
-        if (
-            self.droneState.state == "IDLE"
-            or self.droneState.state == "TAKEOFF"
-            or self.droneState.state == "ARM"
-        ):
-            # msg.x, msg.y, msg.z= setpoint[0], setpoint[1], setpoint[2]
-            msg.position[0] = setpoint[0]
-            msg.position[1] = setpoint[1]
-            msg.position[2] = setpoint[2]
-
-            msg.yaw = self.home_pos[3]
-
-            self.trajectory_pub.publish(msg)
-        elif self.droneState.state == "LAND":
-            # msg.x, msg.y= setpoint[0], setpoint[1]
-            msg.position[0] = setpoint[0]
-            msg.position[1] = setpoint[1]
-
-            # msg.z = np.nan
-            # msg.vx = np.nan
-            # msg.vy = np.nan
-            # msg.vz = 0.05
-            msg.position[2] = np.nan
-            msg.velocity[0] = np.nan
-            msg.velocity[1] = np.nan
-            msg.velocity[2] = 0.05
-
-            msg.yaw = self.home_pos[3]
-            self.trajectory_pub.publish(msg)
-        else:
-            # Traj. Planner
-
-            # Position P controller - Z-axis
-            self.vel_sp_pos = (setpoint[2] - self.curr_pos[2]) * self.mpc_kp_z
-
-            # Contstrain calculated velocities
-            if self.vel_sp_pos < (self.mpc_vel_limit_up * -1):
-                self.vel_sp_pos = self.mpc_vel_limit_up * -1
-
-            if self.vel_sp_pos > (self.mpc_vel_limit_dn):
-                self.vel_sp_pos = self.mpc_vel_limit_dn
-
-            # msg.x, msg.y= setpoint[0], setpoint[1]
-            # msg.z = np.nan
-            # msg.vx = np.nan
-            # msg.vy = np.nan
-            # msg.vz = self.vel_sp_pos
-            msg.position[0] = setpoint[0]
-            msg.position[1] = setpoint[1]
-            msg.position[2] = np.nan
-
-            msg.velocity[0] = np.nan
-            msg.velocity[1] = np.nan
-            msg.velocity[2] = self.vel_sp_pos
-
-            msg.yaw = self.home_pos[3]
-            self.trajectory_pub.publish(msg)
+        # if (
+        #     self.droneState.state == "IDLE"
+        #     or self.droneState.state == "TAKEOFF"
+        #     or self.droneState.state == "ARM"
+        # ):
+        #     # msg.x, msg.y, msg.z= setpoint[0], setpoint[1], setpoint[2]
+        #     msg.position[0] = setpoint[0]
+        #     msg.position[1] = setpoint[1]
+        #     msg.position[2] = setpoint[2]
+        #
+        #     msg.yaw = self.home_pos[3]
+        #
+        #     self.trajectory_pub.publish(msg)
+        # elif self.droneState.state == "LAND":
+        #     # msg.x, msg.y= setpoint[0], setpoint[1]
+        #     msg.position[0] = setpoint[0]
+        #     msg.position[1] = setpoint[1]
+        #
+        #     # msg.z = np.nan
+        #     # msg.vx = np.nan
+        #     # msg.vy = np.nan
+        #     # msg.vz = 0.05
+        #     msg.position[2] = np.nan
+        #     msg.velocity[0] = np.nan
+        #     msg.velocity[1] = np.nan
+        #     msg.velocity[2] = 0.05
+        #
+        #     msg.yaw = self.home_pos[3]
+        #     self.trajectory_pub.publish(msg)
+        # else:
+        #     # Traj. Planner
+        #
+        #     # Position P controller - Z-axis
+        #     self.vel_sp_pos = (setpoint[2] - self.curr_pos[2]) * self.mpc_kp_z
+        #
+        #     # Contstrain calculated velocities
+        #     if self.vel_sp_pos < (self.mpc_vel_limit_up * -1):
+        #         self.vel_sp_pos = self.mpc_vel_limit_up * -1
+        #
+        #     if self.vel_sp_pos > (self.mpc_vel_limit_dn):
+        #         self.vel_sp_pos = self.mpc_vel_limit_dn
+        #
+        #     # msg.x, msg.y= setpoint[0], setpoint[1]
+        #     # msg.z = np.nan
+        #     # msg.vx = np.nan
+        #     # msg.vy = np.nan
+        #     # msg.vz = self.vel_sp_pos
+        #     msg.position[0] = setpoint[0]
+        #     msg.position[1] = setpoint[1]
+        #     msg.position[2] = np.nan
+        #
+        #     msg.velocity[0] = np.nan
+        #     msg.velocity[1] = np.nan
+        #     msg.velocity[2] = self.vel_sp_pos
+        #
+        #     msg.yaw = self.home_pos[3]
+        #     self.trajectory_pub.publish(msg)
+        if self.droneState.state == "ABORT":
+            msg.position[0], msg.position[1], msg.position[2] = (
+                self.home_pos[0],
+                self.home_pos[1],
+                setpoint[2],
+            )
 
     def magnet_publisher(self, cmd):
         msg = FG40MagnetCmd()
@@ -718,7 +776,7 @@ class OffboardControl(Node):
 
     def state_callback(self):
         print(self.droneState.state)
-        self.magnet_publisher("dm")
+        # self.magnet_publisher("dm")
         # if self.droneState.state == 'SCAN':
         # print("Aruco Found: ", OffboardControl.aruco_found)
         # print("Scan Done: ", len(OffboardControl.marker_pos_x) == 20) and (len(OffboardControl.marker_pos_y) == 20)
@@ -729,6 +787,8 @@ class OffboardControl(Node):
         # print("Y array: ", OffboardControl.marker_pos_x)
         self.droneState.trs_next()
         if self.droneState.state == "DISARM":
+            self.magnet_publisher("mag")
+            self.magnet_publisher("mag")
             self.disarm()
             # self.land()
 
@@ -740,9 +800,9 @@ class OffboardControl(Node):
         ):
             self.publish_offboard_heartbeat()
 
-        # if self.send_msg <=0:
-        self.trajectory_setpoint_publisher(self.setpoints)
-        self.send_msg = self.send_msg + 1
+            # if self.send_msg <=0:
+            self.trajectory_setpoint_publisher(self.setpoints)
+            self.send_msg = self.send_msg + 1
 
         if self.offboard_counter < 11:
             self.offboard_counter += 1
