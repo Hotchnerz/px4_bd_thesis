@@ -8,20 +8,40 @@ import os
 def generate_launch_description():
     ld = LaunchDescription()
 
+    image_proc = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            os.path.join(get_package_share_directory('image_proc'),
+                         'launch/image_proc.launch.py')
+    )
+    )
+
+    usb_cam_launch = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            os.path.join(get_package_share_directory('usb_cam'),
+                         'launch/launch.py')
+    )
+    )
+
     gazebo_aruco_node = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             os.path.join(get_package_share_directory('ros2_aruco'),
-                         'launch/aruco_recognition.launch.py')
+                         'launch/aruco_recognition_launch.py')
         )
     )
 
     drone_urdf_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             os.path.join(get_package_share_directory('x500_description'),
-                            'launch/launch.py')
+                            'launch/x500_launch.py')
         )
     )
 
+    micro_ros_node = Node(
+        package="micro_ros_agent",
+        executable="micro_ros_agent",
+        name="micro_ros_agent",
+        arguments=["serial", "--dev", "/dev/ttyACM0"]
+    )
     map_node = Node(
         package="x500_description",
         executable="map_tf_broadcaster"
@@ -34,10 +54,13 @@ def generate_launch_description():
         package="x500_description",
         executable="aruco_transform"
     )
-    
+
+    ld.add_action(image_proc)
+    ld.add_action(usb_cam_launch)
     ld.add_action(gazebo_aruco_node)
     ld.add_action(drone_urdf_launch)
     ld.add_action(map_node)
     ld.add_action(aruco_tf_node)
     ld.add_action(aruco_baselink)
+    ld.add_action(micro_ros_node)
     return ld
