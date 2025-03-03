@@ -13,7 +13,7 @@ setup(
         ),
         ("share/" + package_name, ["package.xml"]),
     ],
-    install_requires=["setuptools"],
+    install_requires=["setuptools", "python-dotenv", "bosdyn-client==4.0.1"],
     zip_safe=True,
     maintainer="radam",
     maintainer_email="radam@todo.todo",
@@ -23,6 +23,7 @@ setup(
     entry_points={
         "console_scripts": [
             "find_spot = doggo_walker.find_spot:main",
+            "spot_pos_send = doggo_walker.spot_pos_send:main",
         ],
     },
 )

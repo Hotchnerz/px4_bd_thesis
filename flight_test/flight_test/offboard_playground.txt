@@ -82,14 +82,7 @@ class DroneState:
 
     def on_exit_LOITER(self, *args):
         # self.update_setpoint([1.5,0,self.flight_height,0])
-        self.update_setpoint(
-            [
-                OffboardControl.spot_pos[0],
-                OffboardControl.spot_pos[1],
-                self.flight_height,
-                OffboardControl.spot_pos[2],
-            ]
-        )
+        self.update_setpoint([1.5, 0, self.flight_height, 0])
         # print("Sending Search Setpoint")
         self.logger.info("Sending Search Setpoint")
 
@@ -258,16 +251,10 @@ class DroneState:
     def set_approach_setpoint(self):
         self.update_setpoint(
             [
-                (
-                    np.mean(self.x_app_setpoint_app)
-                    + OffboardControl.dock_pos[0]
-                ),
-                (
-                    ((np.mean(self.y_app_setpoint_app)) * -1)
-                    + OffboardControl.dock_pos[1]
-                ),
+                (np.mean(self.x_app_setpoint_app) + self.x_offset),
+                (((np.mean(self.y_app_setpoint_app)) * -1) + self.y_offset),
                 self.flight_height,
-                OffboardControl.dock_pos[3],
+                OffboardControl.marker_pos[3],
             ]
         )
         # self.update_setpoint([1.25944,0.0202361,-1.25,OffboardControl.marker_pos[3]])
@@ -320,8 +307,6 @@ class OffboardControl(Node):
     curr_vel = [0.0, 0.0, 0.0, 0.0]
     curr_accel = [0.0, 0.0, 0.0, 0.0]
     marker_pos = [0.0, 0.0, 0.0, 0.0]
-    spot_pos = [0.0, 0.0, 0.0]
-    dock_pos = [0.0, 0.0, 0.0, 0.0]
     marker_pos_x = []
     marker_pos_y = []
 
@@ -395,12 +380,6 @@ class OffboardControl(Node):
         )
         self.aruco_baselink_subscriber = self.create_subscription(
             Pose, "/aruco_baselink", self.aruco_baselink_callback, 10
-        )
-        self.spot_pos_subscriber = self.create_subscription(
-            Pose, "/spot_pos", self.spot_pos_callback, 10
-        )
-        self.dock_pos_subscriber = self.create_subscription(
-            Pose, "/dock_pose", self.dock_pos_callback, 10
         )
 
         self.homeSetPos = False
@@ -675,37 +654,8 @@ class OffboardControl(Node):
                 OffboardControl.marker_pos_x.append(msg.position.x)
                 OffboardControl.marker_pos_y.append(msg.position.y)
 
-    def fg40_status_callback(self, msg):
+    def fg40_status_callback(self):
         pass
-
-    def spot_pos_callback(self, msg):
-        OffboardControl.spot_pos[0] = msg.position.x
-        OffboardControl.spot_pos[1] = msg.position.y
-
-        q = [
-            msg.orientation.x,
-            msg.orientation.y,
-            msg.orientation.z,
-            msg.orientation.w,
-        ]
-
-        spot_rpy = euler_from_quaternion(q)
-        OffboardControl.spot_pos[2] = spot_rpy[2]
-
-    def dock_pos_callback(self, msg):
-        OffboardControl.dock_pos[0] = msg.position.x
-        OffboardControl.dock_pos[1] = msg.position.y
-        OffboardControl.dock_pos[2] = msg.position.z
-
-        q = [
-            msg.orientation.x,
-            msg.orientation.y,
-            msg.orientation.z,
-            msg.orientation.w,
-        ]
-
-        dock_rpy = euler_from_quaternion(q)
-        OffboardControl.spot_pos[2] = dock_rpy[3]
 
     # def arm(self):
     #     self.publish_vehicle_command(VehicleCommand.VEHICLE_CMD_COMPONENT_ARM_DISARM, 1.0)

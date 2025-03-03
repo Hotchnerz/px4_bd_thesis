@@ -1,0 +1,281 @@
+<sdf version="1.7">
+  <model name="x500_description">
+    <link name="global">
+      <inertial>
+        <pose>-0 -7.1e-05 -0.005734 0 -0 0</pose>
+        <mass>0.00213696</mass>
+        <inertia>
+          <ixx>6.2052e-08</ixx>
+          <ixy>2.90472e-24</ixy>
+          <ixz>-7.56602e-23</ixz>
+          <iyy>6.2052e-08</iyy>
+          <iyz>-3.10017e-23</iyz>
+          <izz>6.20067e-08</izz>
+        </inertia>
+      </inertial>
+      <collision name="global_collision">
+        <pose>0 0 0 0 -0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>package://x500_description/meshes/visual/global.STL</uri>
+          </mesh>
+        </geometry>
+      </collision>
+      <visual name="global_visual">
+        <pose>0 0 0 0 -0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>package://x500_description/meshes/visual/global.STL</uri>
+          </mesh>
+        </geometry>
+      </visual>
+    </link>
+    <joint name="base_footprint_joint" type="fixed">
+      <pose relative_to="global">0 0 0 0 -0 0</pose>
+      <parent>global</parent>
+      <child>base_footprint</child>
+      <axis>
+        <xyz>0 1 1</xyz>
+        <limit>
+          <lower>-1e+16</lower>
+          <upper>1e+16</upper>
+        </limit>
+        <dynamics>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>0</spring_stiffness>
+        </dynamics>
+      </axis>
+    </joint>
+    <link name="base_footprint">
+      <pose relative_to="base_footprint_joint">0 0 0 0 -0 0</pose>
+      <inertial>
+        <pose>0 -7.1e-05 -0.158251 0 -0 0</pose>
+        <mass>0.29692</mass>
+        <inertia>
+          <ixx>0.000122761</ixx>
+          <ixy>3.7466e-05</ixy>
+          <ixz>-2.44806e-12</ixz>
+          <iyy>0.000208681</iyy>
+          <iyz>1.97456e-12</iyz>
+          <izz>0.00025389</izz>
+        </inertia>
+      </inertial>
+      <collision name="base_footprint_collision">
+        <pose>0 0 0 0 -0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>package://x500_description/meshes/visual/base_footprint.STL</uri>
+          </mesh>
+        </geometry>
+      </collision>
+      <visual name="base_footprint_visual">
+        <pose>0 0 0 0 -0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>package://x500_description/meshes/visual/base_footprint.STL</uri>
+          </mesh>
+        </geometry>
+      </visual>
+    </link>
+    <joint name="base_joint" type="fixed">
+      <pose relative_to="base_footprint">0 0 -0.137 -3.14159 0 0</pose>
+      <parent>base_footprint</parent>
+      <child>base_link</child>
+      <axis>
+        <xyz>0 0 1</xyz>
+        <limit>
+          <lower>-1e+16</lower>
+          <upper>1e+16</upper>
+        </limit>
+        <dynamics>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>0</spring_stiffness>
+        </dynamics>
+      </axis>
+    </joint>
+    <link name="base_link">
+      <pose relative_to="base_joint">0 0 0 0 -0 0</pose>
+      <inertial>
+        <pose>-0.000123 -0.000195 0.015635 0 -0 0</pose>
+        <mass>0.0752276</mass>
+        <inertia>
+          <ixx>0.000117175</ixx>
+          <ixy>-4.77356e-07</ixy>
+          <ixz>2.71663e-08</ixz>
+          <iyy>0.000110446</iyy>
+          <iyz>-9.1615e-10</iyz>
+          <izz>0.000227544</izz>
+        </inertia>
+      </inertial>
+      <collision name="base_link_collision">
+        <pose>0 0 0 0 -0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>package://x500_description/meshes/visual/base_link.STL</uri>
+          </mesh>
+        </geometry>
+      </collision>
+      <visual name="base_link_visual">
+        <pose>0 0 0 0 -0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>package://x500_description/meshes/visual/base_link.STL</uri>
+          </mesh>
+        </geometry>
+      </visual>
+    </link>
+    <joint name="base_ned_joint" type="fixed">
+      <pose relative_to="base_link">0 0 0 3.14159 -0 0</pose>
+      <parent>base_link</parent>
+      <child>base_ned_link</child>
+      <axis>
+        <xyz>0 0 1</xyz>
+        <limit>
+          <lower>-1e+16</lower>
+          <upper>1e+16</upper>
+        </limit>
+        <dynamics>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>0</spring_stiffness>
+        </dynamics>
+      </axis>
+    </joint>
+    <link name="base_ned_link">
+      <pose relative_to="base_ned_joint">0 0 0 0 -0 0</pose>
+      <inertial>
+        <pose>-0.018613 0.033499 -0.006404 0 -0 0</pose>
+        <mass>0.00437683</mass>
+        <inertia>
+          <ixx>8.4356e-08</ixx>
+          <ixy>2.01802e-09</ixy>
+          <ixz>-1.34463e-10</ixz>
+          <iyy>2.13381e-07</iyy>
+          <iyz>-7.76739e-11</iyz>
+          <izz>2.54207e-07</izz>
+        </inertia>
+      </inertial>
+      <collision name="base_ned_link_collision">
+        <pose>0 0 0 0 -0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>package://x500_description/meshes/visual/base_ned_link.STL</uri>
+          </mesh>
+        </geometry>
+      </collision>
+      <visual name="base_ned_link_visual">
+        <pose>0 0 0 0 -0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>package://x500_description/meshes/visual/base_ned_link.STL</uri>
+          </mesh>
+        </geometry>
+      </visual>
+    </link>
+    <joint name="body_joint" type="fixed">
+      <pose relative_to="base_link">0 0 0.0461 0 -0 0</pose>
+      <parent>base_link</parent>
+      <child>body_link</child>
+      <axis>
+        <xyz>0 0 1</xyz>
+        <limit>
+          <lower>-1e+16</lower>
+          <upper>1e+16</upper>
+        </limit>
+        <dynamics>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>0</spring_stiffness>
+        </dynamics>
+      </axis>
+    </joint>
+    <link name="body_link">
+      <pose relative_to="body_joint">0 0 0 0 -0 0</pose>
+      <inertial>
+        <pose>-0.099719 -0.011305 -0.388368 0 -0 0</pose>
+        <mass>16.5303</mass>
+        <inertia>
+          <ixx>0.205112</ixx>
+          <ixy>4.25434e-08</ixy>
+          <ixz>-1.49056e-08</ixz>
+          <iyy>0.204322</iyy>
+          <iyz>1.15126e-07</iyz>
+          <izz>0.152406</izz>
+        </inertia>
+      </inertial>
+      <collision name="body_link_collision">
+        <pose>0 0 0 0 -0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>package://x500_description/meshes/visual/body_link.STL</uri>
+          </mesh>
+        </geometry>
+      </collision>
+      <visual name="body_link_visual">
+        <pose>0 0 0 0 -0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>package://x500_description/meshes/visual/body_link.STL</uri>
+          </mesh>
+        </geometry>
+      </visual>
+    </link>
+    <joint name="camera_joint" type="fixed">
+      <pose relative_to="base_link">0.075461 0 -0.0331 3.14159 -0 -1.5708</pose>
+      <parent>base_link</parent>
+      <child>camera_link</child>
+      <axis>
+        <xyz>0 0 1</xyz>
+        <limit>
+          <lower>-1e+16</lower>
+          <upper>1e+16</upper>
+        </limit>
+        <dynamics>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>0</spring_stiffness>
+        </dynamics>
+      </axis>
+    </joint>
+    <link name="camera_link">
+      <pose relative_to="camera_joint">0 0 0 0 -0 0</pose>
+      <inertial>
+        <pose>0 0.005995 -0.014694 0 -0 0</pose>
+        <mass>0.0727081</mass>
+        <inertia>
+          <ixx>6.17266e-06</ixx>
+          <ixy>-2.27917e-12</ixy>
+          <ixz>-3.34243e-11</ixz>
+          <iyy>4.39095e-05</iyy>
+          <iyz>2.69223e-07</iyz>
+          <izz>4.42759e-05</izz>
+        </inertia>
+      </inertial>
+      <collision name="camera_link_collision">
+        <pose>0 0 0 0 -0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>package://x500_description/meshes/visual/camera_link.STL</uri>
+          </mesh>
+        </geometry>
+      </collision>
+      <visual name="camera_link_visual">
+        <pose>0 0 0 0 -0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>package://x500_description/meshes/visual/camera_link.STL</uri>
+          </mesh>
+        </geometry>
+      </visual>
+    </link>
+  </model>
+</sdf>
