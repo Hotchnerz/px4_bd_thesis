@@ -54,6 +54,10 @@ def generate_launch_description():
         package="x500_description",
         executable="aruco_transform"
     )
+    dock_tf = Node(
+        package="x500_description",
+        executable="dock_transform"
+    )
 
     ld.add_action(image_proc)
     ld.add_action(usb_cam_launch)
@@ -62,5 +66,6 @@ def generate_launch_description():
     ld.add_action(map_node)
     ld.add_action(aruco_tf_node)
     ld.add_action(aruco_baselink)
+    ld.add_action(dock_tf)
     ld.add_action(micro_ros_node)
     return ld
