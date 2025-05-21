@@ -1,0 +1,36 @@
+#######################################
+# Syntax Coloring Map for 107-Arduino-Cyphal-Support
+#######################################
+
+#######################################
+# Class (KEYWORD1)
+#######################################
+
+cyphal	KEYWORD1
+support	KEYWORD1
+platform	KEYWORD1
+storage	KEYWORD1
+UniqueId	KEYWORD1
+KeyValueStorage_littlefs	KEYWORD1
+
+#######################################
+# Methods and Functions (KEYWORD2)
+#######################################
+
+instance	KEYWORD2
+value	KEYWORD2
+
+get	KEYWORD2
+put	KEYWORD2
+drop	KEYWORD2
+
+reset	KEYWORD2
+reset_sync	KEYWORD2
+reset_async	KEYWORD2
+is_async_reset_pending	KEYWORD2
+
+#######################################
+# Constants (LITERAL1)
+#######################################
+
+InvalidParam	LITERAL1
