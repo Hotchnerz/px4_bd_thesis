@@ -2,14 +2,10 @@
  * INCLUDE
  **************************************************************************************/
 #include <Arduino.h>
-#include <micro_ros_platformio.h>
+#include <ros.h>
 #include <stdio.h>
-#include <rcl/rcl.h>
-#include <rcl/error_handling.h>
-#include <rclc/rclc.h>
-#include <rclc/executor.h>
-#include <fg40_interfaces/msg/fg40_magnet_cmd.h>
-#include <fg40_interfaces/msg/fg40_feedback.h>
+#include <fg40_msgs/FG40MagnetCmd.h>
+#include <fg40_msgs/FG40Feedback.h>
 #include <SPI.h>
 #include <107-Arduino-Cyphal.h>
 #include <107-Arduino-MCP2515.h>
@@ -17,23 +13,17 @@
 #include <107-Arduino-Cyphal-Support.h>
 
 /**************************************************************************************
- * MICRO ROS GLOBALS
+ * ROS SERIAL GLOBALS
  **************************************************************************************/
 
-rcl_subscription_t subscriber;
-rcl_publisher_t publisher;
-fg40_interfaces__msg__FG40MagnetCmd magnet_cmd_msg;
-fg40_interfaces__msg__FG40Feedback feedback_msg;
-fg40_interfaces__msg__FG40Feedback feedback_prev;
-rclc_executor_t executor_pub;
-rclc_executor_t executor_sub;
-rclc_support_t support;
-rcl_allocator_t allocator;
-rcl_node_t node;
-rcl_timer_t timer;
+fg40_msgs::FG40MagnetCmd magnet_cmd_msg;
+fg40_msgs::FG40Feedback feedback_msg;
+fg40_msgs::FG40Feedback feedback_prev;
 
-#define RCCHECK(fn) { rcl_ret_t temp_rc = fn; if((temp_rc != RCL_RET_OK)){error_loop();}}
-#define RCSOFTCHECK(fn) { rcl_ret_t temp_rc = fn; if((temp_rc != RCL_RET_OK)){}}
+ros::NodeHandle nh;
+ros::Publisher mag_status("fg40_status", &feedback_msg);
+ros::Subscriber<fg40_msgs::FG40MagnetCmd> mag_cmd("fg40_cmd", &subscription_callback);
+
 
 /**************************************************************************************
  * MCP2515 CONFIG / GLOBALS
@@ -108,11 +98,8 @@ void error_loop(){
 }
 
 // Callback for publisher
-void timer_callback(rcl_timer_t * timer, int64_t last_call_time)
+void timer_callback()
 {  
-  RCLC_UNUSED(last_call_time);
-  if (timer != NULL) {
-    RCSOFTCHECK(rcl_publish(&publisher, &feedback_msg, NULL));
 
     //If the FG40's last state was active but lost power, publish a force mag cyphal message to resync the state to this node. Otherwise, ignore.
     if ((feedback_prev.magnetized != feedback_msg.magnetized) && ((feedback_prev.cycles_on_off[0] != feedback_msg.cycles_on_off[0]) || ( feedback_prev.cycles_on_off[1] != feedback_msg.cycles_on_off[1]))){
@@ -127,15 +114,13 @@ void timer_callback(rcl_timer_t * timer, int64_t last_call_time)
     feedback_prev.cycles_on_off[0] = feedback_msg.cycles_on_off[0];
     feedback_prev.cycles_on_off[1] = feedback_msg.cycles_on_off[1];
 
-  }
+  
 }
 
 // Listen to /fg40_cmd and publish cmd as a cyphal CAN message
-void subscription_callback(const void * msgin)
+void subscription_callback(const fg40_msgs::FG40MagnetCmd& msgin)
 {  
-  const fg40_interfaces__msg__FG40MagnetCmd * msg = (const fg40_interfaces__msg__FG40MagnetCmd *)msgin;
-
-  int cmd = msg->cmd_magnet;
+  int cmd = msgin.cmd_magnet;
   uavcan::primitive::scalar::Integer8_1_0 cyphal_msg;
 
   switch(cmd){
@@ -143,25 +128,25 @@ void subscription_callback(const void * msgin)
     // Demagnetize FG40
     case 0:
     cyphal_msg.value = 0;
-    cyphal_cmd_pub->publish(cyphal_msg);
+    mag_status.publish(&cyphal_msg);
     break;
 
     // Magnetize FG40
     case 1:
     cyphal_msg.value = 1;
-    cyphal_cmd_pub->publish(cyphal_msg);
+    mag_status.publish(&cyphal_msg);
     break;
 
     // FORCE Magnetize/Demagnetize Cycle on FG40
     case 2:
     cyphal_msg.value = 2;
-    cyphal_cmd_pub->publish(cyphal_msg);
+    mag_status.publish(&cyphal_msg);
     break;
 
     // Ignore other INT values and replace with a magnetize cmd
     default:
     cyphal_msg.value = 1;
-    cyphal_cmd_pub->publish(cyphal_msg);
+    mag_status.publish(&cyphal_msg);
     break;
 
   }
@@ -217,51 +202,15 @@ void setup() {
   cyphal_feedback_sub = node_hdl.create_subscription<zubax::fluxgrip::Feedback_0_1>(FEEDBACK_PORT_ID, onFeedback_0_1_Received);
   delay(1000);
 
-  /* create and dentote the micro ROS transport type for the XRCE Bridge*/
-  set_microros_serial_transports(Serial);
+  nh.initNode();
   
   pinMode(LED_BUILTIN, OUTPUT);
   digitalWrite(LED_BUILTIN, HIGH);  
   
   delay(2000);
-
-  allocator = rcl_get_default_allocator();
-
-  // create init_options
-  RCCHECK(rclc_support_init(&support, 0, NULL, &allocator));
-
-  // create node
-  RCCHECK(rclc_node_init_default(&node, "micro_ros_cyphal_node", "", &support));
-
-  // create subscriber
-  RCCHECK(rclc_subscription_init_default(
-    &subscriber,
-    &node,
-    ROSIDL_GET_MSG_TYPE_SUPPORT(fg40_interfaces, msg, FG40MagnetCmd),
-    "fg40_cmd"));
-
-  // create publisher
-  RCCHECK(rclc_publisher_init_default(
-    &publisher,
-    &node,
-    ROSIDL_GET_MSG_TYPE_SUPPORT(fg40_interfaces, msg, FG40Feedback),
-    "fg40_status"));
-
-  // create timer,
-  const unsigned int timer_timeout = 1300;
-  RCCHECK(rclc_timer_init_default(
-    &timer,
-    &support,
-    RCL_MS_TO_NS(timer_timeout),
-    timer_callback));
-
-  // create executor for publisher
-  RCCHECK(rclc_executor_init(&executor_pub, &support.context, 1, &allocator));
-  RCCHECK(rclc_executor_add_timer(&executor_pub, &timer));
-
-  // create executor for subscriber
-  RCCHECK(rclc_executor_init(&executor_sub, &support.context, 1, &allocator));
-  RCCHECK(rclc_executor_add_subscription(&executor_sub, &subscriber, &magnet_cmd_msg, &subscription_callback, ON_NEW_DATA));
+  
+  nh.publisher(mag_status);
+  nh.subscribe(mag_cmd);
 
   // Instantiate callback message
   feedback_msg.magnetized = false;
@@ -304,7 +253,7 @@ void loop() {
 
   /* Wait a bit and then execute ROS activities*/
   delay(100);
-  RCCHECK(rclc_executor_spin_some(&executor_pub, RCL_MS_TO_NS(100)));
-  RCCHECK(rclc_executor_spin_some(&executor_sub, RCL_MS_TO_NS(100)));
+  timer_callback();
+  nh.spinOnce();
 }
 
