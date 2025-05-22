@@ -15,10 +15,13 @@
 /**************************************************************************************
  * ROS SERIAL GLOBALS
  **************************************************************************************/
+
 fg40_msgs::FG40MagnetCmd magnet_cmd_msg;
 fg40_msgs::FG40Feedback feedback_msg;
 fg40_msgs::FG40Feedback feedback_prev;
 
+//Forward declare here. Pretty sure I can remove magnet_cmd_msg declaration above.
+//As ROS Serial does not use it but I will leave it.
 void subscription_callback(const fg40_msgs::FG40MagnetCmd& msgin);
 
 ros::NodeHandle nh;
@@ -29,6 +32,7 @@ ros::Subscriber<fg40_msgs::FG40MagnetCmd> mag_cmd("fg40_cmd", &subscription_call
  * MCP2515 CONFIG / GLOBALS
  **************************************************************************************/
 
+/*Configure MCP2515 to GPIO pins and set frame behaviour cbs*/
 static int const MKRCAN_MCP2515_CS_PIN  = D17;
 static int const MKRCAN_MCP2515_INT_PIN = D5;
 static SPISettings const MCP2515x_SPI_SETTING{10*1000*1000UL, MSBFIRST, SPI_MODE0};
@@ -53,6 +57,7 @@ ArduinoMCP2515 mcp2515([]()
  * CYPHAL GLOBALS
  **************************************************************************************/
 
+/*Create cyphal objects and set message IDs*/
 cyphal::Node::Heap<cyphal::Node::DEFAULT_O1HEAP_SIZE> node_heap;
 cyphal::Node node_hdl(node_heap.data(), node_heap.size(), micros, [] (CanardFrame const & frame) { return mcp2515.transmit(frame); });
 
@@ -114,6 +119,7 @@ void timer_callback()
     feedback_prev.cycles_on_off[0] = feedback_msg.cycles_on_off[0];
     feedback_prev.cycles_on_off[1] = feedback_msg.cycles_on_off[1];
 
+    //Publish the feedback message.
     mag_status.publish(&feedback_msg);
 
 }
@@ -203,6 +209,7 @@ void setup() {
   cyphal_feedback_sub = node_hdl.create_subscription<zubax::fluxgrip::Feedback_0_1>(FEEDBACK_PORT_ID, onFeedback_0_1_Received);
   delay(1000);
 
+  /*Initialize ROS node handler*/
   nh.initNode();
 
   pinMode(LED_BUILTIN, OUTPUT);
@@ -210,6 +217,7 @@ void setup() {
   
   delay(2000);
   
+  /*Subscribe and advertise topics attached*/
   nh.advertise(mag_status);
   nh.subscribe(mag_cmd);
 
