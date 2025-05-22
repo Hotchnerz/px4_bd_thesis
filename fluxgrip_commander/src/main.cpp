@@ -15,15 +15,15 @@
 /**************************************************************************************
  * ROS SERIAL GLOBALS
  **************************************************************************************/
-
 fg40_msgs::FG40MagnetCmd magnet_cmd_msg;
 fg40_msgs::FG40Feedback feedback_msg;
 fg40_msgs::FG40Feedback feedback_prev;
 
+void subscription_callback(const fg40_msgs::FG40MagnetCmd& msgin);
+
 ros::NodeHandle nh;
 ros::Publisher mag_status("fg40_status", &feedback_msg);
 ros::Subscriber<fg40_msgs::FG40MagnetCmd> mag_cmd("fg40_cmd", &subscription_callback);
-
 
 /**************************************************************************************
  * MCP2515 CONFIG / GLOBALS
@@ -33,7 +33,7 @@ static int const MKRCAN_MCP2515_CS_PIN  = D17;
 static int const MKRCAN_MCP2515_INT_PIN = D5;
 static SPISettings const MCP2515x_SPI_SETTING{10*1000*1000UL, MSBFIRST, SPI_MODE0};
 
-void onReceiveBufferFull    (CanardFrame const &);
+void onReceiveBufferFull(CanardFrame const &);
 void onFeedback_0_1_Received(zubax::fluxgrip::Feedback_0_1 const & recieved_fg40_msg);
 
 ArduinoMCP2515 mcp2515([]()
@@ -86,7 +86,7 @@ void onFeedback_0_1_Received(zubax::fluxgrip::Feedback_0_1 const & recieved_fg40
 }
 
 /**************************************************************************************
- * MICRO ROS FUNCTIONS
+ * ROS SERIAL FUNCTIONS
  **************************************************************************************/
 
 // Flash LED_BUILTIN if ROS functions encounter some sort of error
@@ -114,7 +114,8 @@ void timer_callback()
     feedback_prev.cycles_on_off[0] = feedback_msg.cycles_on_off[0];
     feedback_prev.cycles_on_off[1] = feedback_msg.cycles_on_off[1];
 
-  
+    mag_status.publish(&feedback_msg);
+
 }
 
 // Listen to /fg40_cmd and publish cmd as a cyphal CAN message
@@ -128,25 +129,25 @@ void subscription_callback(const fg40_msgs::FG40MagnetCmd& msgin)
     // Demagnetize FG40
     case 0:
     cyphal_msg.value = 0;
-    mag_status.publish(&cyphal_msg);
+    cyphal_cmd_pub->publish(cyphal_msg);
     break;
 
     // Magnetize FG40
     case 1:
     cyphal_msg.value = 1;
-    mag_status.publish(&cyphal_msg);
+    cyphal_cmd_pub->publish(cyphal_msg);
     break;
 
     // FORCE Magnetize/Demagnetize Cycle on FG40
     case 2:
     cyphal_msg.value = 2;
-    mag_status.publish(&cyphal_msg);
+    cyphal_cmd_pub->publish(cyphal_msg);
     break;
 
     // Ignore other INT values and replace with a magnetize cmd
     default:
     cyphal_msg.value = 1;
-    mag_status.publish(&cyphal_msg);
+    cyphal_cmd_pub->publish(cyphal_msg);
     break;
 
   }
@@ -203,13 +204,13 @@ void setup() {
   delay(1000);
 
   nh.initNode();
-  
+
   pinMode(LED_BUILTIN, OUTPUT);
   digitalWrite(LED_BUILTIN, HIGH);  
   
   delay(2000);
   
-  nh.publisher(mag_status);
+  nh.advertise(mag_status);
   nh.subscribe(mag_cmd);
 
   // Instantiate callback message

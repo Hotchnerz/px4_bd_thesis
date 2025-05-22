@@ -344,12 +344,12 @@ class OffboardController:
         self.spot_pos_subscriber = self.create_subscription(
             Pose, "/spot_pos", self.spot_pos_callback, 10
         )
-        self.dock_pos_subscriber = self.create_subscription(
-            Po
+        # self.dock_pos_subscriber = self.create_subscription(
+            # Po
 
 
         self.state_subscriber = rospy.Subscriber('mavros/state', State, self._state_cb)
-        self. = rospy.Subscriber('mavros/state', State, self._state_cb)
+        #self. = rospy.Subscriber('mavros/state', State, self._state_cb)
 
         # Clients
         rospy.wait_for_service('/mavros/cmd/arming')
