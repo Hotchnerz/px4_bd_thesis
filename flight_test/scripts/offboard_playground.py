@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 import threading
 import rospy
-from geometry_msgs.msg import PoseStamped
-from mavros_msgs.msg import State
+from geometry_msgs.msg import PoseStamped, Pose
+from mavros_msgs.msg import State, ExtendedState
 from mavros_msgs.srv import CommandBool, CommandBoolRequest, SetMode, SetModeRequest
+from fg40_msgs.msg import FG40Feedback, FG40MagnetCmd
 import numpy as np
 import math
 from transitions import Machine
@@ -24,7 +25,7 @@ class DroneState:
         self.marker_detect_attempt = 0
         self.start_time = None
         self.first_call = True
-        self.clock = Clock()
+        #self.clock = Clock()
         self.logger = logger
 
     def test(self):
@@ -189,10 +190,10 @@ class DroneState:
     def time_check(self):
 
         if self.first_call:
-            self.start_time = self.clock.now()
+            self.start_time = rospy.get_rostime()
             self.first_call = False
 
-        current_time = self.clock.now()
+        current_time = rospy.get_rostime()
         elapsed_duration = current_time - self.start_time
         time_delta_sec = elapsed_duration.nanoseconds / 1e9
         # print(time_delta_sec)
@@ -289,67 +290,55 @@ class DroneState:
 
         return drone_land
 
-class OffboardController:
+class OffboardControl:
     def __init__(self):
         rospy.init_node('offb_node_py')
         self.current_state = State()
 
         # Publishers
-        # self.magnet_cmd_pub = rospy.Publisher(
-        #     "/fg40_cmd", FG40MagnetCmd, queue_size=10
-        # )
-        self.setpoint_publisher = rospy.Publisher(
-            'mavros/setpoint_position/local', PoseStamped, queue_size=10)
+        self.magnet_cmd_pub = rospy.Publisher('/fg40_cmd', FG40MagnetCmd, queue_size=10)
+        #Replaces TrajectorySetpoint
+        self.setpoint_publisher = rospy.Publisher('mavros/setpoint_position/local', PoseStamped, queue_size=10)
 
         # Subscribers
-        # self.fg40_status_sub = self.create_subscription(
-        #     FG40Feedback, "/fg40_status", self.fg40_status_callback, 10
+        #  = self.create_subscription(
+        #     , "/fg40_status", , 10
         # )
-        self.drone_status_sub = self.create_subscription(
-            VehicleStatus,
-            "/fmu/out/vehicle_status",
-            self.vehicle_status_callback,
-            qos_profile,
-        )
-        self.localpos_subscriber = self.create_subscription(
-            VehicleLocalPosition,
-            "/fmu/out/vehicle_local_position",
-            self.localpos_callback,
-            qos_profile,
-        )
-        self.vehicle_att_subscriber = self.create_subscription(
-            VehicleAttitude,
-            "/fmu/out/vehicle_attitude",
-            self.vehicle_att_callback,
-            qos_profile,
-        )
-        self.vehicle_att_set_subscriber = self.create_subscription(
-            VehicleAttitudeSetpoint,
-            "/fmu/out/vehicle_attitude_setpoint",
-            self.vehicle_att_set_callback,
-            qos_profile,
-        )
-        self.vehicle_land_det_subscriber = self.create_subscription(
-            VehicleLandDetected,
-            "/fmu/out/vehicle_land_detected",
-            self.vehicle_land_det_callback,
-            qos_profile,
-        )
+        self.fg40_status_sub = rospy.Subscriber("/fg40_status", FG40Feedback, self.localpos_callback)
+
+        # Replaces VehicleLocalPosition and VehicleAttitude for Pose
+        self.localpos_subscriber = rospy.Subscriber("/mavros/local_position/pose", PoseStamped, self.localpos_callback)
+
+        #Replacess VehicleStaus
+        self.drone_status_sub = rospy.Subscriber("/mavros/state", State, self.vehicle_status_callback)
+        
+        #IS THIS setpoint_raw/target_attitude?
+        # self.vehicle_att_set_subscriber = self.create_subscription(
+        #     VehicleAttitudeSetpoint,
+        #     "/fmu/out/vehicle_attitude_setpoint",
+        #     self.vehicle_att_set_callback,
+        #     qos_profile,
+        # )
+
+        #Replacess VehicleLandDetected but is missing the land detector checks built into uORB message.
+        self.drone_status_sub = rospy.Subscriber("/mavros/extended_state", ExtendedState, self.vehicle_land_det_callback)
+
+
         self.aruco_subscriber = self.create_subscription(
             ArucoMarkers, "/aruco_markers", self.aruco_callback, 10
         )
         self.aruco_baselink_subscriber = self.create_subscription(
             Pose, "/aruco_baselink", self.aruco_baselink_callback, 10
         )
+
         self.spot_pos_subscriber = self.create_subscription(
             Pose, "/spot_pos", self.spot_pos_callback, 10
         )
+
+        #???
         # self.dock_pos_subscriber = self.create_subscription(
             # Po
 
-
-        self.state_subscriber = rospy.Subscriber('mavros/state', State, self._state_cb)
-        #self. = rospy.Subscriber('mavros/state', State, self._state_cb)
 
         # Clients
         rospy.wait_for_service('/mavros/cmd/arming')
@@ -390,14 +379,16 @@ class OffboardController:
             "IDLE",
             "ARM",
             conditions=lambda: self.arm_state
-            == VehicleStatus.ARMING_STATE_ARMED,
+            == State.armed,
+            #== VehicleStatus.ARMING_STATE_ARMED,
         )
         self.machine.add_transition(
             "trs_next",
             "ARM",
             "IDLE",
             conditions=lambda: self.arm_state
-            != VehicleStatus.ARMING_STATE_ARMED,
+            != State.armed,
+            #!= VehicleStatus.ARMING_STATE_ARMED,
         )
         self.machine.add_transition(
             "trs_next",
@@ -405,7 +396,8 @@ class OffboardController:
             "TAKEOFF",
             prepare=["set_takeoff_setpoint"],
             conditions=lambda: self.nav_state
-            == VehicleStatus.NAVIGATION_STATE_OFFBOARD
+            == State.MODE_PX4_OFFBOARD
+            #== VehicleStatus.NAVIGATION_STATE_OFFBOARD
             and self.offboard_counter > 10,
         )
 
@@ -495,9 +487,11 @@ class OffboardController:
             "DISARM",
             "IDLE",
             conditions=lambda: self.arm_state
-            == VehicleStatus.ARMING_STATE_STANDBY,
+            == State.MODE_PX4_READY,
+            #== VehicleStatus.ARMING_STATE_STANDBY,
         )
 
+        #This will use mavros_msgs/State
         # Don't want to transition to MAN_OVERRIDE in IDLE or during ARM. So maybe don't use a wild card here?
         # self.machine.add_transition('trs_next', '*', 'MAN_OVERRIDE', conditions = lambda: self.nav_state == VehicleStatus.NAVIGATION_STATE_POSCTL)
         self.machine.add_transition(
@@ -516,8 +510,10 @@ class OffboardController:
             ],
             "MAN_OVERRIDE",
             conditions=lambda: self.nav_state
-            == VehicleStatus.NAVIGATION_STATE_POSCTL
-            or self.nav_state == VehicleStatus.NAVIGATION_STATE_MANUAL,
+            == State.MODE_PX4_POSITION
+            or self.nav_state == State.MODE_PX4_MANUAL,
+            # == VehicleStatus.NAVIGATION_STATE_POSCTL
+            # or self.nav_state == VehicleStatus.NAVIGATION_STATE_MANUAL,
         )
         self.machine.add_transition("trs_next", "MAN_OVERRIDE", "MAN_OVERRIDE")
 
@@ -586,6 +582,6 @@ class OffboardController:
             self._pub_thread.join()
 
 if __name__ == '__main__':
-    controller = OffboardController()
+    controller = OffboardControl()
     controller.start()
 

@@ -1,0 +1,10 @@
+# Vertices to Add to Trajectory
+geometry_msgs/Pose[]   waypoints
+float32                max_vel   # [m/s]
+float32                max_acc   # [m/s²]
+---
+# MAV Trajectory Result
+mav_planning_msgs/PolynomialTrajectory4D trajectory
+---
+# Feedback
+float32               traj_progress  # [0.0–1.0]
