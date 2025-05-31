@@ -3,7 +3,10 @@
 
   "python.analysis.extraPaths": [
     "/opt/ros/melodic/lib/python2.7/dist-packages",
-    "/workspace/install/lib/python3/dist-packages"
+    "/opt/ros/melodic/lib/python3/dist-packages",
+    "/workspace/install/lib/python3/dist-packages",
+    "/home/raddev/thesis_ws/devel/lib/python2.7/dist-packages/aruco_msgs",
+    "./install/lib/python3.10/site-packages"
   ],
 
   "python.envFile": "${workspaceFolder}/.env",

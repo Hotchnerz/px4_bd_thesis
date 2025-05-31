@@ -1,22 +1,24 @@
 #!/usr/bin/env python3
 import threading
 import rospy
-from geometry_msgs.msg import PoseStamped, Pose, TwistStamped, Twist
+from geometry_msgs.msg import PoseStamped, PoseWithCovariance, Pose, TwistStamped, Twist, Point
 from mavros_msgs.msg import State, ExtendedState
+# from tf.transformations import euler_from_quaternion #Cannot use due to melodic pkgs being built with python2
+from flight_test.transform_utils import euler_from_quaternion
 from mavros_msgs.srv import CommandBool, CommandBoolRequest, SetMode, SetModeRequest, CommandLong
 from fg40_msgs.msg import FG40Feedback, FG40MagnetCmd
+from aruco_msgs.msg import MarkerArray, Marker
 import numpy as np
 import math
 from transitions import Machine
 
 class DroneState:
     def __init__(self):
-        self.final_setpoint = [0, 0, 0]
+        self.final_setpoint = Pose()
         self.flight_height = 1.5
         self.new_z = self.flight_height
         self.reset_moving_avg = False
-        self.x_setpoints = []
-        self.y_setpoints = []
+        self.setpoints = []
         self.x_app_setpoint_app = []
         self.y_app_setpoint_app = []
         self.x_offset = -0.326
@@ -35,15 +37,15 @@ class DroneState:
         return False
 
     def update_setpoint(self, target):
-        
+
         OffboardControl.target_pose.position.x = target.position.x + OffboardControl.home_pose.position.x
         OffboardControl.target_pose.position.y = target.position.y + OffboardControl.home_pose.position.y
         OffboardControl.target_pose.position.z = target.position.z + OffboardControl.home_pose.position.z
 
-        OffboardControl.target_pose.orientation.x = target.orientation.x + OffboardControl.home_pose.orientation.x
-        OffboardControl.target_pose.orientation.y = target.orientation.y + OffboardControl.home_pose.orientation.y
-        OffboardControl.target_pose.orientation.z = target.orientation.z + OffboardControl.home_pose.orientation.z
-        OffboardControl.target_pose.orientation.w = target.orientation.w + OffboardControl.home_pose.orientation.w
+        OffboardControl.target_pose.orientation.x = target.orientation.x
+        OffboardControl.target_pose.orientation.y = target.orientation.y
+        OffboardControl.target_pose.orientation.z = target.orientation.z
+        OffboardControl.target_pose.orientation.w = target.orientation.w
 
         rospy.loginfo(
             f"Updating Setpoint - X: {OffboardControl.target_pose.position.x}, Y: {OffboardControl.target_pose.position.y}, Z: {OffboardControl.target_pose.position.z}, YAW: {OffboardControl.target_pose.orientation}"
@@ -58,21 +60,21 @@ class DroneState:
             OffboardControl._pub_thread.start()
             self.thread_start = True
 
-            
-
     # def on_enter_TAKEOFF(self, *args):
     #     self.update_setpoint([0,0,-1.25,0])
     #     #rospy.loginfo("Sending Takeoff Setpoint")
     #     print("Sending Takeoff Setpoint")
 
     def on_exit_IDLE(self, *args):
-        # print(OffboardControl.home_pos)
         rospy.loginfo(f"Home Position Recorded: {OffboardControl.home_pose}")
 
     def on_exit_LOITER(self, *args):
-        # self.update_setpoint([1.5,0,self.flight_height,0])
-        self.update_setpoint(OffboardControl.spot_pose)
-        # print("Sending Search Setpoint")
+        msg = Pose()
+        msg.position.x = OffboardControl.spot_pose.position.x
+        msg.position.y = OffboardControl.spot_pose.position.y
+        msg.position.z = self.flight_height
+        msg.orientation = OffboardControl.home_pose.orientation
+        self.update_setpoint(msg)
         rospy.loginfo("Sending Search Setpoint")
 
     # def on_enter_APPROACH(self, *args):
@@ -84,10 +86,7 @@ class DroneState:
         self.reset_moving_avg = False
         self.x_app_setpoint_app = []
         self.y_app_setpoint_app = []
-        self.x_setpoints = []
-        self.y_setpoints = []
-        OffboardControl.marker_pos_x.clear()
-        OffboardControl.marker_pos_y.clear()
+        OffboardControl.marker_window.clear()
 
     def on_exit_LAND(self, *args):
         # OffboardControl.magnet_publisher("mag")
@@ -103,8 +102,7 @@ class DroneState:
         msg.position.z = self.flight_height
         msg.orientation = OffboardControl.home_pose.orientation
         self.update_setpoint(msg)
-        # print("Sending Search Setpoint")
-        rospy.loginfo("DRONE IS ABORTING LANDING. CAUTION")
+        rospy.loginfo("DRONE IS ABORTING LANDING. CAUTION...")
 
     def marker_found(self):
         # print("Marker Found:" + str(OffboardControl.aruco_found))
@@ -118,22 +116,12 @@ class DroneState:
         return OffboardControl.aruco_found and OffboardControl.first_aruco_msg
 
     def distance_check(self):
-        # print(
-        #     np.sqrt(
-        #         np.square(
-        #             OffboardControl.curr_pos[0] - OffboardControl.marker_pos[0]
-        #         )
-        #         + np.square(
-        #             OffboardControl.curr_pos[1] - OffboardControl.marker_pos[1]
-        #         )
-        #     )
-        # )
         distance = np.sqrt(
             np.square(
-                OffboardControl.curr_pos[0] - OffboardControl.marker_pos[0]
+                OffboardControl.current_pose.position.x - OffboardControl.aruco_pose.position.x
             )
             + np.square(
-                OffboardControl.curr_pos[1] - OffboardControl.marker_pos[1]
+                OffboardControl.current_pose.position.y - OffboardControl.aruco_pose.position.y
             )
         )
 
@@ -187,8 +175,10 @@ class DroneState:
         # Check if x500 is level
         drone_level = False
 
-        if (-0.05 < OffboardControl.rpy[0] < 0.05) and (
-            -0.05 < OffboardControl.rpy[1] < 0.05
+        mav_rpy = euler_from_quaternion(OffboardControl.current_pose.orientation)
+
+        if (-0.05 < mav_rpy[0] < 0.05) and (
+            -0.05 < mav_rpy[1] < 0.05
         ):
             drone_level = True
 
@@ -202,7 +192,7 @@ class DroneState:
 
         current_time = rospy.get_rostime()
         elapsed_duration = current_time - self.start_time
-        time_delta_sec = elapsed_duration.nanoseconds / 1e9
+        time_delta_sec = elapsed_duration.to_sec()
         # print(time_delta_sec)
         rospy.loginfo(f"Timer: {time_delta_sec}")
         if time_delta_sec >= 2.0:
@@ -212,26 +202,33 @@ class DroneState:
 
     def moving_avg(self):
 
-        # Simple Moving Average
+        # Calculate Moving Average using cumulative sum and window of 10
         window = 10
+        sp_x = []
+        sp_y = []
 
         if not self.reset_moving_avg:
-            self.x_setpoints = np.array(OffboardControl.marker_pos_x)
-            self.y_setpoints = np.array(OffboardControl.marker_pos_y)
+            sp_x = np.fromiter((p.x for p in OffboardControl.marker_window),
+                            dtype=np.float64, count=len(OffboardControl.marker_window))
+            sp_y = np.fromiter((p.y for p in OffboardControl.marker_window),
+                            dtype=np.float64, count=len(OffboardControl.marker_window))
             self.reset_moving_avg = True
 
-        weight = np.ones(window) / window
+        sum_x = np.empty(len(OffboardControl.marker_window)+1, dtype=np.float64)
+        sum_y = np.empty(len(OffboardControl.marker_window)+1, dtype=np.float64)
+        sum_x[0] = 0.0
+        sum_y[0] = 0.0
+        np.cumsum(sp_x, out=sum_x[1:])
+        np.cumsum(sp_y, out=sum_y[1:])
 
-        moving_avg_x = np.convolve(self.x_setpoints, weight, mode="valid")
-        moving_avg_y = np.convolve(self.y_setpoints, weight, mode="valid")
+        moving_avg_x = (sum_x[window:] - sum_x[:-window]) / window
+        moving_avg_y = (sum_y[window:] - sum_y[:-window]) / window
 
         return moving_avg_x, moving_avg_y
 
     def scan_check(self):
 
-        if (len(OffboardControl.marker_pos_x) == 20) and (
-            len(OffboardControl.marker_pos_y) == 20
-        ):
+        if (len(OffboardControl.marker_window) == 20):
             self.x_app_setpoint_app, self.y_app_setpoint_app = self.moving_avg()
             return True
         self.scan_attempt += 1
@@ -244,65 +241,48 @@ class DroneState:
         take_off_pose.position.z = self.flight_height
 
         take_off_pose.orientation = OffboardControl.home_pose.orientation
-        # take_off_pose.orientation.w = 0.0
-        # take_off_pose.orientation.x = 0.0
-        # take_off_pose.orientation.y = 0.0
-        # take_off_pose.orientation.z = 0.0
         self.update_setpoint(take_off_pose)
         rospy.loginfo("Sending Takeoff Setpoint")
-        # print("Sending Takeoff Setpoint")
 
     def set_approach_setpoint(self):
-        self.update_setpoint(
-            [
-                (
-                    np.mean(self.x_app_setpoint_app)
-                    + OffboardControl.dock_pos[0]
-                ),
-                (
-                    ((np.mean(self.y_app_setpoint_app)) * -1)
-                    + OffboardControl.dock_pos[1]
-                ),
-                self.flight_height,
-                OffboardControl.dock_pos[3],
-            ]
-        )
-        # self.update_setpoint([1.25944,0.0202361,-1.25,OffboardControl.marker_pos[3]])
-        # print("Approaching Marker")
+        msg = Pose()
+        msg.position.x = np.mean(self.x_app_setpoint_app) + OffboardControl.dock_pose.position.x
+        msg.position.y = 0.0 + OffboardControl.dock_pose.position.y
+        msg.position.z = self.flight_height
+        msg.orientation = OffboardControl.dock_pose.orientation
+
+        rospy.loginfo(f"Approaching Marker: {msg.position.x}, Y: {msg.position.y}")
+
+        self.update_setpoint(msg)
         rospy.loginfo("Approaching Marker")
 
     def set_final_setpoint(self):
-        self.final_setpoint[0] = (
-            OffboardControl.curr_pos[0] - OffboardControl.home_pos[0]
-        )
-        self.final_setpoint[1] = (
-            OffboardControl.curr_pos[1] - OffboardControl.home_pos[1]
-        )
-        self.final_setpoint[2] = (
-            OffboardControl.curr_pos[3] - OffboardControl.home_pos[3]
-        )
+        self.new_z = self.final_setpoint.position.z
+        self.final_setpoint.position.x = OffboardControl.current_pose.position.x - OffboardControl.home_pose.position.x
+        self.final_setpoint.position.y = OffboardControl.current_pose.position.y - OffboardControl.home_pose.position.y
+        self.final_setpoint.position.z = OffboardControl.current_pose.position.z - OffboardControl.home_pose.position.z
+        self.final_setpoint.orientation = OffboardControl.home_pose.orientation
 
     def landing_check(self):
 
         drone_land = False
-        self.new_z += 0.04
+        # self.new_z -= 0.04
+        # msg = Pose()
+        # msg.position = self.final_setpoint.position
+        # msg.orientation = self.final_setpoint.orientation
+        # msg.position.z = self.new_z
+        # self.update_setpoint(msg)
+
+        self.final_setpoint.position.z -= 0.04
+        self.update_setpoint(self.final_setpoint)
+
+        rospy.loginfo(f"Landing Setpoint Z: {self.final_setpoint.position.z}")
+
         # if OffboardControl.droneState.state != "ABORT":
-        self.update_setpoint(
-            [
-                self.final_setpoint[0],
-                self.final_setpoint[1],
-                self.new_z,
-                self.final_setpoint[2],
-            ]
-        )
         # self.update_setpoint([1.25944,0.0202361, new_z, OffboardControl.marker_pos[3]])
         # return drone_land
-        if (
-            OffboardControl.curr_thrust >= -0.48
-            and OffboardControl.close_to_ground
-            and OffboardControl.has_low_throttle
-            # and OffboardControl.in_descend
-        ):
+        #if OffboardControl.landed_state == ExtendedState.LANDED_STATE_ON_GROUND:
+        if OffboardControl.curr_thrust <= 0.45:  #0.120 is the simulated lowest thrust once landed
             drone_land = True
 
         return drone_land
@@ -314,8 +294,14 @@ class OffboardControl:
     dock_pose = Pose()
     spot_pose = Pose()
     target_pose = Pose()
+    aruco_pose = Pose()
     current_vel = Twist()
+    curr_thrust = 0.0
+    marker_window = []
+    first_aruco_msg = False
+    aruco_found = False
     offboard_counter = 0
+    landed_state = 0
 
     def __init__(self):
         rospy.init_node('offb_node_py')
@@ -345,7 +331,7 @@ class OffboardControl:
         self.drone_status_sub = rospy.Subscriber("/mavros/extended_state", ExtendedState, self.vehicle_land_det_callback)
         
         #Replaces ArucoMarkers
-        self.aruco_subscriber = rospy.Subscriber("/aruco_single/pose", PoseStamped, self.aruco_callback)
+        self.aruco_subscriber = rospy.Subscriber("/aruco_marker_publisher/markers", MarkerArray, self.aruco_callback)
 
         # Do I need this?
         # self.aruco_baselink_subscriber = self.create_subscription(
@@ -378,6 +364,7 @@ class OffboardControl:
         OffboardControl.spot_pose.position.x = 1.5
         OffboardControl.spot_pose.position.y = 0.0
         OffboardControl.spot_pose.position.z = 0.0
+        OffboardControl.spot_pose.orientation = OffboardControl.home_pose.orientation
 
 
         self.states = [
@@ -571,11 +558,13 @@ class OffboardControl:
     def localpos_callback(self, msg):
         OffboardControl.current_pose = msg.pose
 
+        #rospy.loginfo(f"LOCAL EULER: {euler_from_quaternion(OffboardControl.current_pose.orientation)}")
+
         if not self.homeSetPos:
             OffboardControl.home_pose = msg.pose
             self.homeSetPos = True
 
-    def localvel_callback(sFelf, msg):
+    def localvel_callback(self, msg):
         OffboardControl.current_vel = msg.twist
 
     # def vehicle_att_callback(self, msg):
@@ -592,7 +581,7 @@ class OffboardControl:
     #     OffboardControl.curr_thrust = msg.thrust_body[2]
 
     def vehicle_land_det_callback(self, msg):
-        pass
+        OffboardControl.landed_state = msg.landed_state
         # OffboardControl.close_to_ground = msg.close_to_ground_or_skipped_check
         # OffboardControl.has_low_throttle = msg.has_low_throttle
         # # OffboardControl.in_descend = msg.in_descend
@@ -600,49 +589,32 @@ class OffboardControl:
     # NEED TO WORK ON THIS
     def aruco_callback(self, msg):
         
-        
-        # self.arucoID = int(msg.marker_ids[0])
-        # if self.arucoID == 122 and self.droneState.state == "SCAN":
-        #     OffboardControl.aruco_found = True
-        # else:
-        #     OffboardControl.aruco_found = False
-        # # print(self.arucoID)
+        for marker in msg.markers:
+            if marker.id == 121:
+                if marker.confidence > 0.8 and self.droneState.state == "SCAN":
+                    OffboardControl.aruco_found = True
+                    if not OffboardControl.first_aruco_msg and OffboardControl.aruco_found:
+                        OffboardControl.first_aruco_msg = True
+                    
+                    #Assuming Hamilton convention
+                    # Want to remove this later...
+                    OffboardControl.aruco_pose = marker.pose.pose
+                    aruco_rpy = euler_from_quaternion(marker.pose.pose.orientation)
 
-    def aruco_baselink_callback(self, msg):
-        pass
-        # # Need a check to ensure that this a new Scan state entrance
-        # if self.droneState.state == "SCAN":
-        #     if not OffboardControl.first_aruco_msg and self.aruco_found:
-        #         OffboardControl.first_aruco_msg = True
+                    marker_position = Point()
+                    marker_position = marker.pose.pose.position
+    
+                    if (len(OffboardControl.marker_window) < 20):
+                        OffboardControl.marker_window.append(marker_position)
+                    elif (len(OffboardControl.marker_window) == 20):
+                        OffboardControl.marker_window.pop(0)
+                        OffboardControl.marker_window.append(marker_position)
 
-        #     q = [
-        #         msg.orientation.x,
-        #         msg.orientation.y,
-        #         msg.orientation.z,
-        #         msg.orientation.w,
-        #     ]
+                else:
+                    OffboardControl.aruco_found = False
 
-        #     aruco_rpy = euler_from_quaternion(q)
-        #     self.marker_pos[3] = aruco_rpy[2]
+        #Should I check to make sure this is being published ref to /map?
 
-        #     # Want to remove this later...
-        #     self.marker_pos[0] = msg.position.x
-        #     self.marker_pos[1] = msg.position.y
-        #     self.marker_pos[2] = msg.position.z
-
-        #     if (len(OffboardControl.marker_pos_x) < 20) and (
-        #         len(OffboardControl.marker_pos_y) < 20
-        #     ):
-        #         OffboardControl.marker_pos_x.append(msg.position.x)
-        #         OffboardControl.marker_pos_y.append(msg.position.y)
-        #     elif (len(OffboardControl.marker_pos_x) == 20) and (
-        #         len(OffboardControl.marker_pos_y) == 20
-        #     ):
-        #         OffboardControl.marker_pos_x.pop(0)
-        #         OffboardControl.marker_pos_y.pop(0)
-
-        #         OffboardControl.marker_pos_x.append(msg.position.x)
-        #         OffboardControl.marker_pos_y.append(msg.position.y)
 
     def fg40_status_callback(self, msg):
         self.mag_status = msg
@@ -687,15 +659,12 @@ class OffboardControl:
     #     rospy.loginfo('Arm command sent')
 
     def disarm(self):
-        # self.publish_vehicle_command(VehicleCommand.VEHICLE_CMD_DO_FLIGHTTERMINATION, 1.0)
         self.publish_vehicle_command(
             400, 0.0, 21196
         )
-        # print("DISARM COMMAND CALLED")
+
         rospy.loginfo("DISARM COMMAND INVOKED")
-        # rospy.loginfo('Shutting down ROS node...')
-        # self.destroy_node()
-        # rclpy.shutdown()
+
 
     # def offboard_activate(self):
     #     self.publish_vehicle_command(VehicleCommand.VEHICLE_CMD_DO_SET_MODE, param1=1.0, param2= 6.0)
@@ -755,6 +724,14 @@ class OffboardControl:
             self.magnet_cmd_pub.publish(msg)
 
     def state_parser(self):
+        """Launch publisher thread, then enter arm/mode control loop."""
+        # try:
+        #     self.state_parser()
+        # except rospy.ROSInterruptException:
+        #     pass
+        # finally:
+        #     pass        #     #self.arm_and_offboard_loop()
+
         rate = rospy.Rate(self.control_rate)
 
         while not rospy.is_shutdown():
@@ -817,20 +794,8 @@ class OffboardControl:
 
     #         self.rate.sleep()
 
-    def start(self):
-        """Launch publisher thread, then enter arm/mode control loop."""
-
-        try:
-            #self.arm_and_offboard_loop()
-            self.state_parser()
-        except rospy.ROSInterruptException:
-            pass
-        finally:
-            pass
-            # self._stop_pub_thread.set()
-            # self._pub_thread.join()
 
 if __name__ == '__main__':
     controller = OffboardControl()
-    controller.start()
+    controller.state_parser()
 

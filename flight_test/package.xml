@@ -54,12 +54,12 @@
   <depend>std_msgs</depend>
   <depend>actionlib_msgs</depend>
   <depend>geometry_msgs</depend>
-  <depend>mav_planning_msgs</depend>
+  <!--<depend>mav_planning_msgs</depend>
   <depend>mav_trajectory_generation</depend>
   <depend>mav_trajectory_generation_ros</depend>
 
   <exec_depend>message_generation</exec_depend>
-
+    -->
 
 
   <!-- The export tag contains other, unspecified, tags -->
