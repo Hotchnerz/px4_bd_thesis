@@ -2,32 +2,29 @@
 import threading
 import rospy
 from geometry_msgs.msg import PoseStamped, PoseWithCovariance, Pose, TwistStamped, Twist, Point
-from mavros_msgs.msg import State, ExtendedState
+from mavros_msgs.msg import State, ExtendedState, AttitudeTarget
 # from tf.transformations import euler_from_quaternion #Cannot use due to melodic pkgs being built with python2
 from flight_test.transform_utils import euler_from_quaternion
-from mavros_msgs.srv import CommandBool, CommandBoolRequest, SetMode, SetModeRequest, CommandLong
+from mavros_msgs.srv import CommandBool, CommandBoolRequest, SetMode, SetModeRequest, CommandLong, CommandLongRequest
 from fg40_msgs.msg import FG40Feedback, FG40MagnetCmd
 from aruco_msgs.msg import MarkerArray, Marker
 import numpy as np
-import math
 from transitions import Machine
 
 class DroneState:
     def __init__(self):
         self.final_setpoint = Pose()
         self.flight_height = 1.5
-        self.new_z = self.flight_height
         self.reset_moving_avg = False
         self.setpoints = []
         self.x_app_setpoint_app = []
         self.y_app_setpoint_app = []
-        self.x_offset = -0.326
-        self.y_offset = 0.0
         self.scan_attempt = 0
         self.marker_detect_attempt = 0
         self.start_time = None
         self.first_call = True
         self.thread_start = False
+        self.controller = None
         #self.clock = Clock()
         #self.logger = logger
 
@@ -56,8 +53,15 @@ class DroneState:
         rospy.loginfo("FAILSAFE ENTERED, RESTART PROGRAM...")
 
     def on_enter_ARM(self, *args):
+        # Start pub thread if not already running
         if not self.thread_start:
-            OffboardControl._pub_thread.start()
+            # Reset stop event flag
+            OffboardControl.stop_pub_thread.clear()
+
+            # Create and start the publisher thread
+            OffboardControl.pub_thread = threading.Thread(target=self.controller.trajectory_setpoint_publisher)
+            OffboardControl.pub_thread.daemon = True
+            OffboardControl.pub_thread.start()
             self.thread_start = True
 
     # def on_enter_TAKEOFF(self, *args):
@@ -103,6 +107,22 @@ class DroneState:
         msg.orientation = OffboardControl.home_pose.orientation
         self.update_setpoint(msg)
         rospy.loginfo("DRONE IS ABORTING LANDING. CAUTION...")
+
+    def on_enter_MAN_OVERRIDE(self, *args):
+        self.stop_thread()
+    
+    def on_enter_IDLE(self, *args):
+        self.stop_thread()
+
+    def on_enter_DISARM(self, *args):
+        self.stop_thread()
+
+    def stop_thread(self):
+        # Stop the publisher thread and join it if it's running
+        if self.thread_start and OffboardControl.pub_thread and OffboardControl.pub_thread.is_alive():
+            OffboardControl.stop_pub_thread.set()
+            OffboardControl.pub_thread.join(timeout=2.0)
+            self.thread_start = False
 
     def marker_found(self):
         # print("Marker Found:" + str(OffboardControl.aruco_found))
@@ -201,7 +221,6 @@ class DroneState:
         return False
 
     def moving_avg(self):
-
         # Calculate Moving Average using cumulative sum and window of 10
         window = 10
         sp_x = []
@@ -227,7 +246,6 @@ class DroneState:
         return moving_avg_x, moving_avg_y
 
     def scan_check(self):
-
         if (len(OffboardControl.marker_window) == 20):
             self.x_app_setpoint_app, self.y_app_setpoint_app = self.moving_avg()
             return True
@@ -257,21 +275,13 @@ class DroneState:
         rospy.loginfo("Approaching Marker")
 
     def set_final_setpoint(self):
-        self.new_z = self.final_setpoint.position.z
         self.final_setpoint.position.x = OffboardControl.current_pose.position.x - OffboardControl.home_pose.position.x
         self.final_setpoint.position.y = OffboardControl.current_pose.position.y - OffboardControl.home_pose.position.y
         self.final_setpoint.position.z = OffboardControl.current_pose.position.z - OffboardControl.home_pose.position.z
         self.final_setpoint.orientation = OffboardControl.home_pose.orientation
 
     def landing_check(self):
-
         drone_land = False
-        # self.new_z -= 0.04
-        # msg = Pose()
-        # msg.position = self.final_setpoint.position
-        # msg.orientation = self.final_setpoint.orientation
-        # msg.position.z = self.new_z
-        # self.update_setpoint(msg)
 
         self.final_setpoint.position.z -= 0.04
         self.update_setpoint(self.final_setpoint)
@@ -286,6 +296,21 @@ class DroneState:
             drone_land = True
 
         return drone_land
+
+    def lost_fiducial_check(self):
+        # Return True if we've lost the fiducial while at setpoint
+        if self.setpoint_check() and self.attitude_check():
+            # If we're at setpoint and level, but don't see the marker
+            if not OffboardControl.aruco_found and OffboardControl.first_aruco_msg:
+                self.marker_detect_attempt += 1
+                if self.marker_detect_attempt >= 10:  # More aggressive threshold for loss at setpoint
+                    return True
+            
+            # Return True if attempt check fails
+            if self.attempt_check():
+                return True
+            
+        return False
 
 class OffboardControl:
     current_state = State()
@@ -302,6 +327,8 @@ class OffboardControl:
     aruco_found = False
     offboard_counter = 0
     landed_state = 0
+    stop_pub_thread = None
+    pub_thread = None
 
     def __init__(self):
         rospy.init_node('offb_node_py')
@@ -309,7 +336,7 @@ class OffboardControl:
         # Publishers
         self.magnet_cmd_pub = rospy.Publisher('/fg40_cmd', FG40MagnetCmd, queue_size=10)
         #Replaces TrajectorySetpoint
-        self.setpoint_publisher = rospy.Publisher('mavros/setpoint_position/local', PoseStamped, queue_size=10)
+        self.setpoint_publisher = rospy.Publisher('/mavros/setpoint_position/local', PoseStamped, queue_size=10)
 
         # Subscribers
         self.fg40_status_sub = rospy.Subscriber("/fg40_status", FG40Feedback, self.fg40_status_callback)
@@ -337,7 +364,7 @@ class OffboardControl:
         # self.aruco_baselink_subscriber = self.create_subscription(
         #     Pose, "/aruco_baselink", self.aruco_baselink_callback, 10
         # )
-
+        self.thrust_subscriber = rospy.Subscriber("/mavros/setpoint_raw/target_attitude", AttitudeTarget, self.thrust_callback)
         self.spot_pos_subscriber = rospy.Subscriber("/spot_pos", Pose, self.spot_pos_callback)
 
         #???
@@ -361,7 +388,7 @@ class OffboardControl:
         self.homeSetPos = False
         self.mag_status = FG40Feedback()
 
-        OffboardControl.spot_pose.position.x = 1.5
+        OffboardControl.spot_pose.position.x = 1.0
         OffboardControl.spot_pose.position.y = 0.0
         OffboardControl.spot_pose.position.z = 0.0
         OffboardControl.spot_pose.orientation = OffboardControl.home_pose.orientation
@@ -385,7 +412,7 @@ class OffboardControl:
         ]
 
         self.droneState = DroneState()
-        # self.droneState = DroneState()
+        self.droneState.controller = self
         self.machine = Machine(
             model=self.droneState, states=self.states, initial="IDLE"
         )
@@ -458,15 +485,15 @@ class OffboardControl:
             "trs_next",
             ["SCAN", "FINAPP"],
             "ABORT",
-            # If the scan failed but you are at the setpoint sent to
-            conditions=["attempt_check", "setpoint_check", "attitude_check"],
-            # unless=["scan_check", "marker_found"],
+            conditions=["lost_fiducial_check"],
         )
 
+        # Everytime LAND state is entered, set the final setpoint, otherwise it will send -0.04 m
         self.machine.add_transition(
             "trs_next",
             "ABORT",
             "LAND",
+            prepare=["set_final_setpoint"],
             conditions=["setpoint_check", "attitude_check"],
         )
 
@@ -500,8 +527,11 @@ class OffboardControl:
             "trs_next",
             "DISARM",
             "IDLE",
-            conditions=lambda: OffboardControl.current_state.mode
-            == State.MODE_PX4_READY,
+            conditions=lambda: (OffboardControl.current_state.mode == State.MODE_PX4_READY) or 
+            (OffboardControl.current_state.mode in [State.MODE_PX4_OFFBOARD, 
+                                                    State.MODE_PX4_POSITION, 
+                                                    State.MODE_PX4_MANUAL] and 
+            not OffboardControl.current_state.armed and OffboardControl.current_state.system_status == 3),
             #== VehicleStatus.ARMING_STATE_STANDBY,
         )
 
@@ -534,12 +564,12 @@ class OffboardControl:
         # self.machine.add_transition('trs_next', 'LAND', 'IDLE', conditions=['test'])
 
         self.sp_pub_rate = 20
-        self.control_rate = 0.5
+        self.control_rate = 1.5
         #self.rate = rospy.Rate(self.rate_hz)
 
-        self._stop_pub_thread = threading.Event()
-        OffboardControl._pub_thread = threading.Thread(target=self.trajectory_setpoint_publisher)
-        OffboardControl._pub_thread.daemon = True
+        OffboardControl.stop_pub_thread = threading.Event()
+        OffboardControl.pub_thread = threading.Thread(target=self.trajectory_setpoint_publisher)
+        OffboardControl.pub_thread.daemon = True
 
     def vehicle_status_callback(self, msg):
         # msg.system_status = 8 -> FAILSAFE
@@ -567,18 +597,8 @@ class OffboardControl:
     def localvel_callback(self, msg):
         OffboardControl.current_vel = msg.twist
 
-    # def vehicle_att_callback(self, msg):
-    #     q = [msg.q[1], msg.q[2], msg.q[3], msg.q[0]]
-
-    #     OffboardControl.rpy = euler_from_quaternion(q)
-
-    #     self.curr_yaw = OffboardControl.rpy[2]
-    #     if not self.homeSetYaw:
-    #         self.home_pos[3] = self.curr_yaw
-    #         self.homeSetYaw = True
-
-    # def vehicle_att_set_callback(self, msg):
-    #     OffboardControl.curr_thrust = msg.thrust_body[2]
+    def thrust_callback(self, msg):
+        OffboardControl.curr_thrust = msg.thrust
 
     def vehicle_land_det_callback(self, msg):
         OffboardControl.landed_state = msg.landed_state
@@ -610,8 +630,8 @@ class OffboardControl:
                         OffboardControl.marker_window.pop(0)
                         OffboardControl.marker_window.append(marker_position)
 
-                else:
-                    OffboardControl.aruco_found = False
+            else:
+                OffboardControl.aruco_found = False
 
         #Should I check to make sure this is being published ref to /map?
 
@@ -659,10 +679,7 @@ class OffboardControl:
     #     rospy.loginfo('Arm command sent')
 
     def disarm(self):
-        self.publish_vehicle_command(
-            400, 0.0, 21196
-        )
-
+        self.call_vehicle_command(400, 0.0, 21196)
         rospy.loginfo("DISARM COMMAND INVOKED")
 
 
@@ -670,18 +687,33 @@ class OffboardControl:
     #     self.publish_vehicle_command(VehicleCommand.VEHICLE_CMD_DO_SET_MODE, param1=1.0, param2= 6.0)
     #     rospy.loginfo("Switch to Offboard")
 
-    def publish_vehicle_command(self, command, param1=0.0, param2=0.0):
-        #https://mavlink.io/en/messages/common.html#mav_commands
-        msg = CommandLong()
-        msg.param1 = float(param1)
-        msg.param2 = float(param2)
-        msg.command = command
-        # msg.target_system = 1
-        # msg.target_component = 1
-        # msg.source_system = 1
-        # msg.source_component = 1
-        # msg.from_external = True
-        self.vehicle_cmd_pub.publish(msg)
+    # def publish_vehicle_command(self, command, param1=0.0, param2=0.0):
+    #     #https://mavlink.io/en/messages/common.html#mav_commands
+    #     msg = CommandLong()
+    #     msg.param1 = float(param1)
+    #     msg.param2 = float(param2)
+    #     msg.command = command
+    #     # msg.target_system = 1
+    #     # msg.target_component = 1
+    #     # msg.source_system = 1
+    #     # msg.source_component = 1
+    #     # msg.from_external = True
+    #     self.vehicle_cmd_pub.publish(msg)
+
+    def call_vehicle_command(self, command, param1=0.0, param2=0.0, param3=0.0, param4=0.0, param5=0.0, param6=0.0, param7=0.0):
+        cmd = CommandLongRequest()
+        cmd.param1 = float(param1)
+        cmd.param2 = float(param2)
+        cmd.param3 = float(param3)
+        cmd.param4 = float(param4)
+        cmd.param5 = float(param5)
+        cmd.param6 = float(param6)
+        cmd.param7 = float(param7)
+        cmd.command = command
+        resp = self.command_client.call(cmd)
+        
+        rospy.loginfo(f"Command {command} sent with response: {resp}")
+        return resp.success
 
     #Only need to send setpoints, no heartbeat
     # def publish_offboard_heartbeat(self):
@@ -696,10 +728,9 @@ class OffboardControl:
     #     self.offboard_control_mode_pub.publish(msg)
 
     def trajectory_setpoint_publisher(self):
-        
         rate = rospy.Rate(self.sp_pub_rate)
         
-        while not rospy.is_shutdown():
+        while not rospy.is_shutdown() and not OffboardControl.stop_pub_thread.is_set():
             msg = PoseStamped()
             msg.pose = OffboardControl.target_pose
             self.setpoint_publisher.publish(msg)
@@ -724,75 +755,19 @@ class OffboardControl:
             self.magnet_cmd_pub.publish(msg)
 
     def state_parser(self):
-        """Launch publisher thread, then enter arm/mode control loop."""
-        # try:
-        #     self.state_parser()
-        # except rospy.ROSInterruptException:
-        #     pass
-        # finally:
-        #     pass        #     #self.arm_and_offboard_loop()
-
+        """Launch State thread, to enter offboard control loop. ARM state will start the setpoint publisher thread."""
         rate = rospy.Rate(self.control_rate)
-
         while not rospy.is_shutdown():
-
             rospy.loginfo(f"CURRENT STATE: {self.droneState.state}")
-            print(OffboardControl.offboard_counter)
-
             self.droneState.trs_next()
+            
             if self.droneState.state == "DISARM":
                 rospy.loginfo("Magnetizing FG40...")
                 self.magnet_publisher("mag")
                 self.magnet_publisher("mag")
                 self.disarm()
-                self._stop_pub_thread.set()
-                self._pub_thread.join()
-                # self.land()
+
             rate.sleep()
-#-----------------------------------------------------------------------------------------------------------------------------------
-            
-    # def _publish_loop(self):
-    #     """Continuously publish setpoints at self.rate_hz until shutdown."""
-    #     while not rospy.is_shutdown() and not self.current_state.connected:
-    #         self.rate.sleep()
-
-    #     for _ in range(100):
-    #         if rospy.is_shutdown() or self._stop_pub_thread.is_set():
-    #             return
-    #         self.setpoint_publisher.publish(self.pose)
-    #         self.offboard_counter += 1
-    #         self.rate.sleep()
-
-    #     while not rospy.is_shutdown() and not self._stop_pub_thread.is_set():
-    #         self.setpoint_publisher.publish(self.pose)
-    #         self.rate.sleep()
-
-    # def arm_and_offboard_loop(self):
-    #     """In the main thread: try to switch mode and arm every 5 s."""
-    #     # offb_req = SetModeRequest()
-    #     # offb_req.custom_mode = 'OFFBOARD'
-    #     # arm_req = CommandBoolRequest()
-    #     # arm_req.value = True
-
-    #     last_req = rospy.Time.now()
-
-    #     while not rospy.is_shutdown():
-    #         now = rospy.Time.now()
-    #         # if self.current_state.mode != 'OFFBOARD' and (now - last_req) > rospy.Duration(5.0):
-    #         #     resp = self.set_mode_client.call(offb_req)
-    #         #     if resp.mode_sent:
-    #         #         rospy.loginfo('[OffboardController] OFFBOARD enabled')
-    #         #     last_req = now
-        
-    #         if (now - last_req) > rospy.Duration(1.0):
-    #             self.rate = rospy.Rate(self.rate_hz)
-    #             self.state_callback()
-    #             # resp = self.arming_client.call(arm_req)
-    #             # if resp.success:
-    #             #     rospy.loginfo('[OffboardController] Vehicle armed')
-    #             last_req = now
-
-    #         self.rate.sleep()
 
 
 if __name__ == '__main__':
