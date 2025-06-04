@@ -48,9 +48,6 @@
     <arg name="sdf"     value="$(arg sdf)"/>
   </include>
 
-  <include file="$(find x500_description)/launch/x500_bringup.launch">
-  </include>
-
   <include file="$(find aruco_ros)/launch/gz_marker_publisher.launch">
   </include>
 

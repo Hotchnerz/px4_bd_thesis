@@ -265,7 +265,7 @@ class DroneState:
     def set_approach_setpoint(self):
         msg = Pose()
         msg.position.x = np.mean(self.x_app_setpoint_app) + OffboardControl.dock_pose.position.x
-        msg.position.y = 0.0 + OffboardControl.dock_pose.position.y
+        msg.position.y = np.mean(self.y_app_setpoint_app) + OffboardControl.dock_pose.position.y
         msg.position.z = self.flight_height
         msg.orientation = OffboardControl.dock_pose.orientation
 
@@ -388,7 +388,7 @@ class OffboardControl:
         self.homeSetPos = False
         self.mag_status = FG40Feedback()
 
-        OffboardControl.spot_pose.position.x = 1.0
+        OffboardControl.spot_pose.position.x = 1.6
         OffboardControl.spot_pose.position.y = 0.0
         OffboardControl.spot_pose.position.z = 0.0
         OffboardControl.spot_pose.orientation = OffboardControl.home_pose.orientation

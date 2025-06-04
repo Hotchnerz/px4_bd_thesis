@@ -1,0 +1,5 @@
+setup.py
+x500_description.egg-info/PKG-INFO
+x500_description.egg-info/SOURCES.txt
+x500_description.egg-info/dependency_links.txt
+x500_description.egg-info/top_level.txt
