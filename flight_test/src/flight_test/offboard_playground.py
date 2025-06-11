@@ -14,7 +14,7 @@ from transitions import Machine
 class DroneState:
     def __init__(self):
         self.final_setpoint = Pose()
-        self.flight_height = 1.5
+        self.flight_height = 1.2
         self.reset_moving_avg = False
         self.setpoints = []
         self.x_app_setpoint_app = []
