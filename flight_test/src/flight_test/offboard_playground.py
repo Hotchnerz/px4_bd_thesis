@@ -14,7 +14,7 @@ from transitions import Machine
 class DroneState:
     def __init__(self):
         self.final_setpoint = Pose()
-        self.flight_height = 1.2
+        self.flight_height = 1.3
         self.reset_moving_avg = False
         self.setpoints = []
         self.x_app_setpoint_app = []
@@ -25,6 +25,9 @@ class DroneState:
         self.first_call = True
         self.thread_start = False
         self.controller = None
+        self.x_app = 0.0
+        self.y_app = 0.0
+        self.offapp_flag = False
         #self.clock = Clock()
         #self.logger = logger
 
@@ -260,12 +263,16 @@ class DroneState:
 
         take_off_pose.orientation = OffboardControl.home_pose.orientation
         self.update_setpoint(take_off_pose)
-        rospy.loginfo("Sending Takeoff Setpoint")
-
+        
     def set_approach_setpoint(self):
+        if not self.offapp_flag:
+            self.x_app = np.mean(self.x_app_setpoint_app)
+            self.y_app = np.mean(self.y_app_setpoint_app)
+            self.offapp_flag = True
+
         msg = Pose()
-        msg.position.x = np.mean(self.x_app_setpoint_app) + OffboardControl.dock_pose.position.x
-        msg.position.y = np.mean(self.y_app_setpoint_app) + OffboardControl.dock_pose.position.y
+        msg.position.x = np.mean(self.x_app_setpoint_app)
+        msg.position.y = np.mean(self.y_app_setpoint_app)
         msg.position.z = self.flight_height
         msg.orientation = OffboardControl.dock_pose.orientation
 
@@ -273,6 +280,26 @@ class DroneState:
 
         self.update_setpoint(msg)
         rospy.loginfo("Approaching Marker")
+
+    def set_finapp_setpoint(self):
+        if not self.offapp_flag:
+            self.x_app = np.mean(self.x_app_setpoint_app)
+            self.y_app = np.mean(self.y_app_setpoint_app)
+            self.offapp_flag = True
+            
+        msg = Pose()
+        msg.position.x = self.x_app + OffboardControl.dock_pose.position.x
+        msg.position.y = self.y_app + OffboardControl.dock_pose.position.y
+        msg.position.z = self.flight_height
+        msg.orientation = OffboardControl.dock_pose.orientation
+
+        rospy.loginfo(f"Final Marker App: {msg.position.x}, Y: {msg.position.y}")
+
+        self.update_setpoint(msg)
+        rospy.loginfo("Final Approach...")
+    
+    def offapp_check(self):
+        return self.offapp_flag
 
     def set_final_setpoint(self):
         self.final_setpoint.position.x = OffboardControl.current_pose.position.x - OffboardControl.home_pose.position.x
@@ -333,6 +360,17 @@ class OffboardControl:
     def __init__(self):
         rospy.init_node('offb_node_py')
 
+        self.homeSetPos = False
+        self.mag_status = FG40Feedback()
+
+        self.sp_pub_rate = 20
+        self.control_rate = 1.5
+        #self.rate = rospy.Rate(self.rate_hz)
+
+        OffboardControl.stop_pub_thread = threading.Event()
+        OffboardControl.pub_thread = threading.Thread(target=self.trajectory_setpoint_publisher)
+        OffboardControl.pub_thread.daemon = True
+
         # Publishers
         self.magnet_cmd_pub = rospy.Publisher('/fg40_cmd', FG40MagnetCmd, queue_size=10)
         #Replaces TrajectorySetpoint
@@ -365,7 +403,7 @@ class OffboardControl:
         #     Pose, "/aruco_baselink", self.aruco_baselink_callback, 10
         # )
         self.thrust_subscriber = rospy.Subscriber("/mavros/setpoint_raw/target_attitude", AttitudeTarget, self.thrust_callback)
-        self.spot_pos_subscriber = rospy.Subscriber("/spot_pos", Pose, self.spot_pos_callback)
+        self.spot_pos_subscriber = rospy.Subscriber("/spot_pose", PoseStamped, self.spot_pos_callback)
 
         #???
         # self.dock_pos_subscriber = self.create_subscription(
@@ -385,13 +423,17 @@ class OffboardControl:
         # self.current_state.mode = State.MODE_PX4_READY #NAVIGATION_STATE_MAX
         # self.current_state.armed = False #ARMING_STATE_MAX
         # self.current_state.system_status = 3 #MAV_STATE_STANDBY
-        self.homeSetPos = False
-        self.mag_status = FG40Feedback()
 
-        OffboardControl.spot_pose.position.x = 1.6
+
+        OffboardControl.spot_pose.position.x = 2.1
         OffboardControl.spot_pose.position.y = 0.0
         OffboardControl.spot_pose.position.z = 0.0
         OffboardControl.spot_pose.orientation = OffboardControl.home_pose.orientation
+
+        OffboardControl.dock_pose.position.x = -0.8
+        OffboardControl.dock_pose.position.y = 0.0
+        OffboardControl.dock_pose.position.z = 0.0
+        OffboardControl.dock_pose.orientation = OffboardControl.home_pose.orientation
 
 
         self.states = [
@@ -501,7 +543,7 @@ class OffboardControl:
             "trs_next",
             "SCAN",
             "FINAPP",
-            before=["set_approach_setpoint"],
+            before=["set_finapp_setpoint"],
             conditions=["scan_check", "marker_found"],
             unless=["distance_check"],
         )
@@ -562,14 +604,6 @@ class OffboardControl:
         self.machine.add_transition("trs_next", "MAN_OVERRIDE", "MAN_OVERRIDE")
 
         # self.machine.add_transition('trs_next', 'LAND', 'IDLE', conditions=['test'])
-
-        self.sp_pub_rate = 20
-        self.control_rate = 1.5
-        #self.rate = rospy.Rate(self.rate_hz)
-
-        OffboardControl.stop_pub_thread = threading.Event()
-        OffboardControl.pub_thread = threading.Thread(target=self.trajectory_setpoint_publisher)
-        OffboardControl.pub_thread.daemon = True
 
     def vehicle_status_callback(self, msg):
         # msg.system_status = 8 -> FAILSAFE
@@ -641,7 +675,7 @@ class OffboardControl:
 
     def spot_pos_callback(self, msg):
 
-        OffboardControl.spot_pose = msg
+        OffboardControl.spot_pose = msg.pose
 
         #Remove this
         # OffboardControl.spot_pos[0] = msg.position.x
