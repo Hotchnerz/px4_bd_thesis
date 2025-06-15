@@ -21,9 +21,6 @@
 		<arg name="respawn_mavros" value="$(arg respawn_mavros)" />
 	</include>
 
-  <include file="$(find doggo_walker)/launch/broadcasters.launch">
-  </include>
-
   <include file="$(find aruco_ros)/launch/d455_marker_publisher.launch">
   </include>
 
