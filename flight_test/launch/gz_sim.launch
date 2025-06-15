@@ -1,0 +1,61 @@
+<?xml version="1.0"?>
+<launch>
+  <!-- Position/orientation offsets -->
+  <arg name="x"       default="0"/>
+  <arg name="y"       default="0"/>
+  <arg name="z"       default="0"/>
+  <arg name="R"       default="0"/>
+  <arg name="P"       default="0"/>
+  <arg name="Y"       default="0"/>
+
+  <!-- PX4 estimator and vehicle model -->
+  <arg name="est"     default="ekf2"/>
+  <arg name="vehicle" default="x500_gps"/>
+
+  <!--
+    Point to the world file inside your PX4 clone.
+    $(find px4) should resolve to the root of PX4-Autopilot,
+    so this expands to:
+    <your_ws>/src/PX4-Autopilot/Tools/simulation/gazebo-classic/sitl_gazebo-classic/worlds/x500_gps.world
+  -->
+  <arg name="world"
+       default="$(find px4)/Tools/simulation/gazebo-classic/sitl_gazebo-classic/worlds/$(arg vehicle).world"/>
+
+  <!--
+    Use the built-in mavlink_sitl_gazebo package for models,
+    which defines its own share/…/models folder:
+    models/x500_gps/x500_gps.sdf
+  -->
+  <arg name="sdf"
+       default="$(find mavlink_sitl_gazebo)/models/$(arg vehicle)/$(arg vehicle).sdf"/>
+
+  <!-- PX4 SITL environment variables 
+  <env name="PX4_SIM_MODEL" value="$(arg vehicle)"/>
+  <env name="PX4_ESTIMATOR" value="$(arg est)"/>
+  -->
+
+  <!-- Include the standard PX4+MAVROS SITL wrapper -->
+  <include file="$(find px4)/launch/mavros_posix_sitl.launch">
+    <arg name="x"       value="$(arg x)"/>
+    <arg name="y"       value="$(arg y)"/>
+    <arg name="z"       value="$(arg z)"/>
+    <arg name="R"       value="$(arg R)"/>
+    <arg name="P"       value="$(arg P)"/>
+    <arg name="Y"       value="$(arg Y)"/>
+    <arg name="est"     value="$(arg est)"/>
+    <arg name="vehicle" value="$(arg vehicle)"/>
+    <arg name="world"   value="$(arg world)"/>
+    <arg name="sdf"     value="$(arg sdf)"/>
+  </include>
+
+  <include file="$(find aruco_ros)/launch/gz_marker_publisher.launch">
+  </include>
+
+  <include file="$(find x500_description)/launch/x500_bringup.launch">
+  </include>
+
+  <include file="$(find doggo_walker)/launch/gz_broadcasters.launch">
+  </include>
+
+
+</launch>
