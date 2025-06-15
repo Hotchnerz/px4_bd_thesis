@@ -1,54 +1,47 @@
 <?xml version="1.0"?>
 <launch>
-  <!-- Position/orientation offsets -->
-  <arg name="x"       default="0"/>
-  <arg name="y"       default="0"/>
-  <arg name="z"       default="0"/>
-  <arg name="R"       default="0"/>
-  <arg name="P"       default="0"/>
-  <arg name="Y"       default="0"/>
 
-  <!-- PX4 estimator and vehicle model -->
-  <arg name="est"     default="ekf2"/>
-  <arg name="vehicle" default="x500_gps"/>
+	<arg name="fcu_url" default="/dev/ttyUSB0:921600" />
+	<arg name="gcs_url" default="" />
+	<arg name="tgt_system" default="1" />
+	<arg name="tgt_component" default="1" />
+	<arg name="log_output" default="screen" />
+	<arg name="fcu_protocol" default="v2.0" />
+	<arg name="respawn_mavros" default="false" />
+	<arg name="namespace" default="mavros"/>
 
-  <!--
-    Point to the world file inside your PX4 clone.
-    $(find px4) should resolve to the root of PX4-Autopilot,
-    so this expands to:
-    <your_ws>/src/PX4-Autopilot/Tools/simulation/gazebo-classic/sitl_gazebo-classic/worlds/x500_gps.world
-  -->
-  <arg name="world"
-       default="$(find px4)/Tools/simulation/gazebo-classic/sitl_gazebo-classic/worlds/$(arg vehicle).world"/>
+	<include file="$(find-pkg-share mavros)/launch/node.launch">
+		<arg name="pluginlists_yaml" value="$(find-pkg-share mavros)/launch/px4_pluginlists.yaml" />
+		<arg name="config_yaml" value="$(find-pkg-share mavros)/launch/px4_config.yaml" />
+		<arg name="fcu_url" value="$(var fcu_url)" />
+		<arg name="gcs_url" value="$(var gcs_url)" />
+		<arg name="tgt_system" value="$(var tgt_system)" />
+		<arg name="tgt_component" value="$(var tgt_component)" />
+		<arg name="log_output" value="$(var log_output)" />
+		<arg name="fcu_protocol" value="$(var fcu_protocol)" />
+		<arg name="respawn_mavros" value="$(var respawn_mavros)" />
+		<arg name="namespace" value="$(var namespace)"/>
+	</include>
 
-  <!--
-    Use the built-in mavlink_sitl_gazebo package for models,
-    which defines its own share/…/models folder:
-    models/x500_gps/x500_gps.sdf
-  -->
-  <arg name="sdf"
-       default="$(find mavlink_sitl_gazebo)/models/$(arg vehicle)/$(arg vehicle).sdf"/>
-
-  <!-- PX4 SITL environment variables 
-  <env name="PX4_SIM_MODEL" value="$(arg vehicle)"/>
-  <env name="PX4_ESTIMATOR" value="$(arg est)"/>
-  -->
-
-  <!-- Include the standard PX4+MAVROS SITL wrapper -->
-  <include file="$(find px4)/launch/mavros_posix_sitl.launch">
-    <arg name="x"       value="$(arg x)"/>
-    <arg name="y"       value="$(arg y)"/>
-    <arg name="z"       value="$(arg z)"/>
-    <arg name="R"       value="$(arg R)"/>
-    <arg name="P"       value="$(arg P)"/>
-    <arg name="Y"       value="$(arg Y)"/>
-    <arg name="est"     value="$(arg est)"/>
-    <arg name="vehicle" value="$(arg vehicle)"/>
-    <arg name="world"   value="$(arg world)"/>
-    <arg name="sdf"     value="$(arg sdf)"/>
+  <include file="$(find doggo_walker)/launch/broadcasters.launch">
   </include>
 
-  <include file="$(find aruco_ros)/launch/gz_marker_publisher.launch">
+  <include file="$(find aruco_ros)/launch/d455_marker_publisher.launch">
   </include>
+
+  <include file="$(find x500_description)/launch/x500_bringup.launch">
+  </include>
+
+  <include file="$(find realsense2_camera)/launch/rs_d455.launch">
+  </include>
+
+  <include file="$(find realsense2_camera)/launch/rs_d455.launch">
+  </include>
+
+  <node name="serial_node"        pkg="rosserial_python"      type="serial_node.py">
+  <param name="port"              type="string"               value="/dev/ttyACM0"/>
+  <param name="baud"              type="int"                  value="115200"/>
+  </node>
 
 </launch>
+
