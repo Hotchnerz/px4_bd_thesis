@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import threading
 import rospy
-from geometry_msgs.msg import PoseStamped, PoseWithCovariance, Pose, TwistStamped, Twist, Point
+from geometry_msgs.msg import PoseStamped, PoseWithCovariance, Pose, TwistStamped, Twist, Point, TransformStamped
 from mavros_msgs.msg import State, ExtendedState, AttitudeTarget
 # from tf.transformations import euler_from_quaternion #Cannot use due to melodic pkgs being built with python2
 from flight_test.transform_utils import euler_from_quaternion
@@ -14,7 +14,7 @@ from transitions import Machine
 class DroneState:
     def __init__(self):
         self.final_setpoint = Pose()
-        self.flight_height = 1.3
+        self.flight_height = 1.25
         self.reset_moving_avg = False
         self.setpoints = []
         self.x_app_setpoint_app = []
@@ -404,11 +404,7 @@ class OffboardControl:
         # )
         self.thrust_subscriber = rospy.Subscriber("/mavros/setpoint_raw/target_attitude", AttitudeTarget, self.thrust_callback)
         self.spot_pos_subscriber = rospy.Subscriber("/spot_pose", PoseStamped, self.spot_pos_callback)
-
-        #???
-        # self.dock_pos_subscriber = self.create_subscription(
-            # Po
-
+        self.dock_pos_subscriber = rospy.Subscriber("/dock_pose", PoseStamped, self.dock_pos_callback)
 
         # Clients
         #Not using arming service. Opting to arm via CMD Long service
@@ -430,10 +426,10 @@ class OffboardControl:
         OffboardControl.spot_pose.position.z = 0.0
         OffboardControl.spot_pose.orientation = OffboardControl.home_pose.orientation
 
-        OffboardControl.dock_pose.position.x = -0.8
-        OffboardControl.dock_pose.position.y = 0.0
-        OffboardControl.dock_pose.position.z = 0.0
-        OffboardControl.dock_pose.orientation = OffboardControl.home_pose.orientation
+        # OffboardControl.dock_pose.position.x = -0.8
+        # OffboardControl.dock_pose.position.y = 0.0
+        # OffboardControl.dock_pose.position.z = 0.0
+        # OffboardControl.dock_pose.orientation = OffboardControl.home_pose.orientation
 
 
         self.states = [
@@ -693,7 +689,7 @@ class OffboardControl:
 
     def dock_pos_callback(self, msg):
 
-        OffboardControl.dock_pose = msg
+        OffboardControl.dock_pose = msg.pose
         # OffboardControl.dock_pos[0] = msg.position.x
         # OffboardControl.dock_pos[1] = msg.position.y
         # OffboardControl.dock_pos[2] = msg.position.z
