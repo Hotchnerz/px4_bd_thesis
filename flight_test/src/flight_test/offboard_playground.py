@@ -38,9 +38,9 @@ class DroneState:
 
     def update_setpoint(self, target):
 
-        OffboardControl.target_pose.position.x = target.position.x + OffboardControl.home_pose.position.x
-        OffboardControl.target_pose.position.y = target.position.y + OffboardControl.home_pose.position.y
-        OffboardControl.target_pose.position.z = target.position.z + OffboardControl.home_pose.position.z
+        OffboardControl.target_pose.position.x = target.position.x
+        OffboardControl.target_pose.position.y = target.position.y
+        OffboardControl.target_pose.position.z = target.position.z
 
         OffboardControl.target_pose.orientation.x = target.orientation.x
         OffboardControl.target_pose.orientation.y = target.orientation.y

@@ -38,7 +38,7 @@ class SpotBodyPublisher:
         # self.bd_user = config.get("BOSDYN_CLIENT_USERNAME")
         # self.bd_pass = config.get("BOSDYN_CLIENT_PASSWORD")
 
-        self.hostname = "192.168.1.18"
+        self.hostname = "192.168.1.76"
         self.bd_user = "admin"
         self.bd_pass = "4aud2u39hgfd"
 

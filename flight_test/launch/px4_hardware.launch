@@ -21,4 +21,6 @@
 		<arg name="respawn_mavros" value="$(arg respawn_mavros)" />
 	</include>
 
+	<node name="spot_pose" pkg="doggo_walker" type="spot_bridge.py" output="screen" />
+
 </launch>

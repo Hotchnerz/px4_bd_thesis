@@ -1,15 +1,18 @@
 <?xml version="1.0"?>
 <launch>
  <!-- static tfs for aruco and realsense -->
+ <!--<node pkg="tf2_ros" type="static_transform_publisher" name="global_to_map"
+        args ="0.0 0.0 0.0 0.0 0.0 0.7071068 0.7071068  global map" />
+-->
+
    <node pkg="tf2_ros" type="static_transform_publisher" name="global_to_map"
-        args ="0.0 0.0 0.0 0.0 0.0 0.0 1.0 global map" />
+        args ="0.0 0.0 0.0 0.0 0.0 0.0 1.0  global map" />
 
     <node pkg="tf2_ros" type="static_transform_publisher" name="realsense_to_baselink"
         args ="0.135 0.0 -0.079 0.7071 -0.7071 0.0 0.0 base_link d455_link" />
 
     <node pkg="tf2_ros" type="static_transform_publisher" name="cam0_to_corrpose"
         args ="0.0 0.0 0.0 -0.7071068 0.7071068 0.0 0.0 cam0 corr_pose" />
-
 
 </launch>
 
