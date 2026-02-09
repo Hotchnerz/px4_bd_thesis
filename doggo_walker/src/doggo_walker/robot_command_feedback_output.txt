@@ -1,0 +1,90 @@
+[INFO] [1759536473.070508]: Spot @ 192.168.80.3 auth successful
+[INFO] [1759536473.620681]: State client created... Entering ROS Timer callback
+[INFO] [1759536473.699419]: THIS LEASE BELONGS TO 192.168.80.3 NOW!
+header {
+  request_header {
+    request_timestamp {
+      seconds: 1759536473
+      nanos: 922966272
+    }
+    client_name: "findSpot_melodicbionic-dev:__main__.py-696153"
+  }
+  request_received_timestamp {
+    seconds: 1759536802
+    nanos: 206208572
+  }
+  response_timestamp {
+    seconds: 1759536802
+    nanos: 206247760
+  }
+  error {
+    code: CODE_OK
+  }
+}
+feedback {
+  synchronized_feedback {
+    mobility_command_feedback {
+      stance_feedback {
+        status: STATUS_GOING_TO_STANCE
+      }
+      status: STATUS_PROCESSING
+    }
+  }
+}
+lease_use_result {
+  status: STATUS_OK
+  owner {
+    client_name: "findSpot_melodicbionic-dev:__main__.py-696153"
+  }
+  attempted_lease {
+    resource: "body"
+    epoch: "WLEPGHeXUkZRolwr"
+    sequence: 20
+    sequence: 1
+    client_names: "root"
+    client_names: "findSpot_melodic"
+  }
+  previous_lease {
+    resource: "body"
+    epoch: "WLEPGHeXUkZRolwr"
+    sequence: 20
+    sequence: 1
+    client_names: "root"
+    client_names: "findSpot_melodic"
+  }
+  latest_known_lease {
+    resource: "body"
+    epoch: "WLEPGHeXUkZRolwr"
+    sequence: 20
+    sequence: 1
+    client_names: "root"
+    client_names: "findSpot_melodic"
+  }
+  latest_resources {
+    resource: "arm"
+    epoch: "WLEPGHeXUkZRolwr"
+    sequence: 20
+    client_names: "root"
+  }
+  latest_resources {
+    resource: "fan"
+    epoch: "WLEPGHeXUkZRolwr"
+    sequence: 20
+    client_names: "root"
+  }
+  latest_resources {
+    resource: "gripper"
+    epoch: "WLEPGHeXUkZRolwr"
+    sequence: 20
+    client_names: "root"
+  }
+  latest_resources {
+    resource: "mobility"
+    epoch: "WLEPGHeXUkZRolwr"
+    sequence: 20
+    sequence: 1
+    client_names: "root"
+    client_names: "findSpot_melodic"
+  }
+}
+

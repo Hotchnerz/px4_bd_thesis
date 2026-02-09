@@ -11,173 +11,6 @@ from aruco_msgs.msg import MarkerArray, Marker
 import numpy as np
 from transitions import Machine
 from transitions.extensions.states import add_state_features, Timeout
-import copy
-
-# Configuration Management
-class MissionConfig:
-    """Centralized configuration for mission parameters"""
-    # Flight parameters
-    FLIGHT_HEIGHT = 1.25
-    TAKEOFF_SPEED = 0.3
-    APPROACH_SPEED = 0.3
-    LANDING_SPEED = 0.2
-    DEFAULT_SPEED = 0.5
-    
-    # Tolerances
-    POSITION_TOLERANCE = 0.05
-    VELOCITY_TOLERANCE = 0.04
-    ATTITUDE_TOLERANCE = 0.05
-    
-    # Timing
-    PREP_LAND_TIME_SEC = 2.0
-    MOVING_AVG_WINDOW = 20
-    MAX_SCAN_ATTEMPTS = 25
-    MAX_MARKER_DETECT_ATTEMPTS = 25
-    
-    # Publishing rates
-    SETPOINT_RATE_HZ = 20
-    CONTROL_RATE_HZ = 1.5
-    
-    # Trajectory
-    MIN_TRAJECTORY_TIME = 1.0
-
-class SmoothTrajectoryManager:
-    """Handles smooth cubic interpolation between waypoints"""
-    
-    def __init__(self, default_speed=MissionConfig.DEFAULT_SPEED):
-        self.trajectory_lock = threading.RLock()
-        self.trajectory_active = False
-        self.default_speed = default_speed
-        
-        # Trajectory state
-        self.start_pose = Pose()
-        self.target_pose_smooth = Pose()
-        self.current_smooth_pose = Pose()
-        
-        # Timing
-        self.trajectory_start_time = None
-        self.trajectory_duration = 0.0
-        self.min_trajectory_time = MissionConfig.MIN_TRAJECTORY_TIME
-        
-    def start_smooth_trajectory(self, target_pose, speed=None, trajectory_type="waypoint"):
-        """Start smooth trajectory to target pose"""
-        with self.trajectory_lock:
-            # Use current OffboardControl.target_pose as start
-            self.start_pose = copy.deepcopy(OffboardControl.target_pose)
-            self.target_pose_smooth = copy.deepcopy(target_pose)
-            
-            # Calculate trajectory duration based on 3D distance
-            distance = self.calculate_3d_distance(self.start_pose, self.target_pose_smooth)
-            
-            # Adjust speed based on trajectory type
-            if trajectory_type == "takeoff":
-                effective_speed = MissionConfig.TAKEOFF_SPEED
-            elif trajectory_type == "landing":
-                effective_speed = MissionConfig.LANDING_SPEED
-            elif trajectory_type == "approach":
-                effective_speed = MissionConfig.APPROACH_SPEED
-            else:
-                effective_speed = speed if speed else self.default_speed
-            
-            self.trajectory_duration = max(
-                distance / effective_speed,
-                self.min_trajectory_time
-            )
-            
-            self.trajectory_start_time = rospy.Time.now()
-            self.trajectory_active = True
-            
-            rospy.loginfo(f"Starting smooth {trajectory_type}: {distance:.2f}m over {self.trajectory_duration:.2f}s")
-            rospy.loginfo(f"  From: ({self.start_pose.position.x:.2f}, {self.start_pose.position.y:.2f}, {self.start_pose.position.z:.2f})")
-            rospy.loginfo(f"  To: ({self.target_pose_smooth.position.x:.2f}, {self.target_pose_smooth.position.y:.2f}, {self.target_pose_smooth.position.z:.2f})")
-    
-    def update_smooth_trajectory(self):
-        """Update smooth trajectory - returns True when complete"""
-        if not self.trajectory_active:
-            return False
-            
-        with self.trajectory_lock:
-            elapsed = (rospy.Time.now() - self.trajectory_start_time).to_sec()
-            progress = elapsed / self.trajectory_duration
-            
-            if progress >= 1.0:
-                # Trajectory complete - snap to final position
-                OffboardControl.target_pose = copy.deepcopy(self.target_pose_smooth)
-                self.current_smooth_pose = copy.deepcopy(self.target_pose_smooth)
-                self.trajectory_active = False
-                
-                rospy.loginfo(f"Smooth trajectory complete at ({OffboardControl.target_pose.position.x:.2f}, {OffboardControl.target_pose.position.y:.2f}, {OffboardControl.target_pose.position.z:.2f})")
-                return True
-            
-            # Apply cubic ease-in-out to progress
-            smooth_progress = self.cubic_ease_in_out(progress)
-            
-            # 3D position interpolation
-            OffboardControl.target_pose.position.x = (
-                self.start_pose.position.x + 
-                smooth_progress * (self.target_pose_smooth.position.x - self.start_pose.position.x)
-            )
-            OffboardControl.target_pose.position.y = (
-                self.start_pose.position.y + 
-                smooth_progress * (self.target_pose_smooth.position.y - self.start_pose.position.y)
-            )
-            OffboardControl.target_pose.position.z = (
-                self.start_pose.position.z + 
-                smooth_progress * (self.target_pose_smooth.position.z - self.start_pose.position.z)
-            )
-            
-            # Orientation interpolation (SLERP would be better, but this works)
-            OffboardControl.target_pose.orientation.x = (
-                self.start_pose.orientation.x + 
-                smooth_progress * (self.target_pose_smooth.orientation.x - self.start_pose.orientation.x)
-            )
-            OffboardControl.target_pose.orientation.y = (
-                self.start_pose.orientation.y + 
-                smooth_progress * (self.target_pose_smooth.orientation.y - self.start_pose.orientation.y)
-            )
-            OffboardControl.target_pose.orientation.z = (
-                self.start_pose.orientation.z + 
-                smooth_progress * (self.target_pose_smooth.orientation.z - self.start_pose.orientation.z)
-            )
-            OffboardControl.target_pose.orientation.w = (
-                self.start_pose.orientation.w + 
-                smooth_progress * (self.target_pose_smooth.orientation.w - self.start_pose.orientation.w)
-            )
-            
-            self.current_smooth_pose = copy.deepcopy(OffboardControl.target_pose)
-            return False
-    
-    def calculate_3d_distance(self, pose1, pose2):
-        """Calculate 3D Euclidean distance between two poses"""
-        dx = pose2.position.x - pose1.position.x
-        dy = pose2.position.y - pose1.position.y
-        dz = pose2.position.z - pose1.position.z
-        return np.sqrt(dx*dx + dy*dy + dz*dz)
-    
-    @staticmethod
-    def cubic_ease_in_out(t):
-        """Cubic ease-in-out interpolation for smooth acceleration/deceleration"""
-        return t * t * (3.0 - 2.0 * t)
-    
-    def is_trajectory_active(self):
-        """Check if smooth trajectory is currently active"""
-        with self.trajectory_lock:
-            return self.trajectory_active
-    
-    def cancel_trajectory(self):
-        """Emergency stop - cancel current trajectory"""
-        with self.trajectory_lock:
-            self.trajectory_active = False
-            rospy.logwarn("Smooth trajectory cancelled")
-    
-    def get_trajectory_progress(self):
-        """Get current trajectory progress [0.0, 1.0]"""
-        if not self.trajectory_active:
-            return 1.0
-            
-        with self.trajectory_lock:
-            elapsed = (rospy.Time.now() - self.trajectory_start_time).to_sec()
-            return min(elapsed / self.trajectory_duration, 1.0)
 
 @add_state_features(Timeout)
 class TimeoutMachine(Machine):
@@ -186,7 +19,7 @@ class TimeoutMachine(Machine):
 class DroneState:
     def __init__(self):
         self.final_setpoint = Pose()
-        self.flight_height = MissionConfig.FLIGHT_HEIGHT
+        self.flight_height = 1.25
         self.reset_moving_avg = False
         self.setpoints = []
         self.x_app_setpoint_app = []
@@ -207,10 +40,6 @@ class DroneState:
         self.scan_time_done = False
         self.land_time_done = False
 
-        # Add smooth trajectory manager
-        self.smooth_trajectory = SmoothTrajectoryManager()
-        self.trajectory_complete = False
-
     def test(self):
         return False
 
@@ -229,32 +58,9 @@ class DroneState:
             f"Updating Setpoint - X: {OffboardControl.target_pose.position.x}, Y: {OffboardControl.target_pose.position.y}, Z: {OffboardControl.target_pose.position.z}, YAW: {OffboardControl.target_pose.orientation}"
         )
 
-    def update_setpoint_smooth(self, target, speed=None, trajectory_type="waypoint"):
-        """New smooth setpoint update using cubic interpolation"""
-        # Convert relative positioning to absolute
-        absolute_target = Pose()
-
-        # absolute_target.position.x = target.position.x + OffboardControl.home_pose.position.x
-        # absolute_target.position.y = target.position.y + OffboardControl.home_pose.position.y
-        # absolute_target.position.z = target.position.z + OffboardControl.home_pose.position.z
-
-        absolute_target.position.x = target.position.x
-        absolute_target.position.y = target.position.y
-        absolute_target.position.z = target.position.z
-        absolute_target.orientation = target.orientation
-        
-        # Start smooth trajectory
-        self.smooth_trajectory.start_smooth_trajectory(absolute_target, speed, trajectory_type)
-        self.trajectory_complete = False
-        
-        rospy.loginfo(f"Starting smooth {trajectory_type} to ({target.position.x:.2f}, {target.position.y:.2f}, {target.position.z:.2f})")
-
-
     def on_enter_FAILSAFE(self, *args):
         # print("FAILSAFE ENTERED, RESTART PROGRAM...")
         rospy.loginfo("FAILSAFE ENTERED, RESTART PROGRAM...")
-        # Cancel any active trajectories
-        self.smooth_trajectory.cancel_trajectory()
 
     def on_enter_ARM(self, *args):
         # Start pub thread if not already running
@@ -277,9 +83,7 @@ class DroneState:
         msg.position.y = OffboardControl.spot_pose.position.y
         msg.position.z = self.flight_height
         msg.orientation = OffboardControl.home_pose.orientation
-        # self.update_setpoint(msg)
-        # rospy.loginfo("Sending Search Setpoint")
-        self.update_setpoint_smooth(msg, trajectory_type="search")
+        self.update_setpoint(msg)
         rospy.loginfo("Sending Search Setpoint")
 
     def on_exit_SCAN(self, *args):
@@ -322,22 +126,17 @@ class DroneState:
         msg.orientation = OffboardControl.home_pose.orientation
         self.final_x_sp = OffboardControl.home_pose.position.x
         self.final_y_sp = OffboardControl.home_pose.position.y
-        # self.update_setpoint(msg)
-        # rospy.loginfo("DRONE IS ABORTING LANDING. CAUTION...")
-        self.update_setpoint_smooth(msg, trajectory_type="abort")
+        self.update_setpoint(msg)
         rospy.loginfo("DRONE IS ABORTING LANDING. CAUTION...")
 
     def on_enter_MAN_OVERRIDE(self, *args):
         self.stop_thread()
-        self.smooth_trajectory.cancel_trajectory()
     
     def on_enter_IDLE(self, *args):
         self.stop_thread()
-        self.smooth_trajectory.cancel_trajectory()
 
     def on_enter_DISARM(self, *args):
         self.stop_thread()
-        self.smooth_trajectory.cancel_trajectory()
 
     def stop_thread(self):
         # Stop the publisher thread and join it if it's running
@@ -380,10 +179,7 @@ class DroneState:
         self.scan_check()
         self.marker_found()
 
-        # if self.scan_attempt >= 25 and self.marker_detect_attempt >= 25:
-        #     return True
-        # return False
-        if self.scan_attempt >= MissionConfig.MAX_SCAN_ATTEMPTS and self.marker_detect_attempt >= MissionConfig.MAX_MARKER_DETECT_ATTEMPTS:
+        if self.scan_attempt >= 25 and self.marker_detect_attempt >= 25:
             return True
         return False
 
@@ -394,39 +190,29 @@ class DroneState:
 
         if (
             (
-                sp2Validiate.x - MissionConfig.POSITION_TOLERANCE
+                sp2Validiate.x - 0.05
                 < OffboardControl.current_pose.position.x
-                < sp2Validiate.x + MissionConfig.POSITION_TOLERANCE
+                < sp2Validiate.x + 0.05
             )
             and (
-                sp2Validiate.y - MissionConfig.POSITION_TOLERANCE
+                sp2Validiate.y - 0.05
                 < OffboardControl.current_pose.position.y
-                < sp2Validiate.y + MissionConfig.POSITION_TOLERANCE
+                < sp2Validiate.y + 0.05
             )
             and (
-                sp2Validiate.z - MissionConfig.POSITION_TOLERANCE
+                sp2Validiate.z - 0.05
                 < OffboardControl.current_pose.position.z
-                < sp2Validiate.z + MissionConfig.POSITION_TOLERANCE
+                < sp2Validiate.z + 0.05
             )
         ):
             if (
-                (-MissionConfig.VELOCITY_TOLERANCE < OffboardControl.current_vel.linear.x < MissionConfig.VELOCITY_TOLERANCE)
-                and (-MissionConfig.VELOCITY_TOLERANCE < OffboardControl.current_vel.linear.y < MissionConfig.VELOCITY_TOLERANCE)
-                and (-MissionConfig.VELOCITY_TOLERANCE < OffboardControl.current_vel.linear.z < MissionConfig.VELOCITY_TOLERANCE)
+                (-0.04 < OffboardControl.current_vel.linear.x < 0.04)
+                and (-0.04 < OffboardControl.current_vel.linear.y < 0.04)
+                and (-0.04 < OffboardControl.current_vel.linear.z < 0.04)
             ):
                 setpointReached = True
 
         return setpointReached
-
-    def setpoint_check_smooth(self):
-        """Enhanced setpoint check that works with smooth trajectories"""
-        # First check if smooth trajectory is complete
-        if self.smooth_trajectory.is_trajectory_active():
-            return False  # Still moving along trajectory
-            
-        # If trajectory complete, check if drone has settled at position
-        return self.setpoint_check()  # Use original position/velocity check
-
 
     def attitude_check(self):
         # Check if x500 is level
@@ -434,8 +220,8 @@ class DroneState:
 
         mav_rpy = euler_from_quaternion(OffboardControl.current_pose.orientation)
 
-        if (-MissionConfig.ATTITUDE_TOLERANCE < mav_rpy[0] < MissionConfig.ATTITUDE_TOLERANCE) and (
-            -MissionConfig.ATTITUDE_TOLERANCE < mav_rpy[1] < MissionConfig.ATTITUDE_TOLERANCE
+        if (-0.05 < mav_rpy[0] < 0.05) and (
+            -0.05 < mav_rpy[1] < 0.05
         ):
             drone_level = True
 
@@ -500,8 +286,9 @@ class DroneState:
         return moving_avg_x, moving_avg_y
 
     def scan_check(self):
-        if (len(OffboardControl.marker_window) == MissionConfig.MOVING_AVG_WINDOW):
+        if (len(OffboardControl.marker_window) == 20):
             self.x_app_setpoint_app, self.y_app_setpoint_app = self.moving_avg()
+            rospy.loginfo(f"Scann Check Retrives: X: {self.x_app_setpoint_app}, Y: {self.y_app_setpoint_app}")
             return True
         self.scan_attempt += 1
         return False
@@ -513,18 +300,7 @@ class DroneState:
         take_off_pose.position.z = self.flight_height
 
         take_off_pose.orientation = OffboardControl.home_pose.orientation
-        # self.update_setpoint(take_off_pose)
-        self.update_setpoint_smooth(take_off_pose, trajectory_type="takeoff")
-
-    def set_takeoff_setpoint_smooth(self):
-        """New smooth takeoff setpoint"""
-        take_off_pose = Pose()
-        take_off_pose.position.x = 0.0
-        take_off_pose.position.y = 0.0
-        take_off_pose.position.z = self.flight_height
-        take_off_pose.orientation = OffboardControl.home_pose.orientation
-        
-        self.update_setpoint_smooth(take_off_pose, trajectory_type="takeoff")
+        self.update_setpoint(take_off_pose)
         
     def set_approach_setpoint(self):
         if not self.offapp_flag:
@@ -542,24 +318,6 @@ class DroneState:
 
         self.update_setpoint(msg)
         rospy.loginfo("Approaching Marker")
-
-    def set_approach_setpoint_smooth(self):
-        """New smooth approach setpoint"""
-        if not self.offapp_flag:
-            self.x_app = np.mean(self.x_app_setpoint_app)
-            self.y_app = np.mean(self.y_app_setpoint_app)
-            self.offapp_flag = True
-
-        msg = Pose()
-        msg.position.x = np.mean(self.x_app_setpoint_app)
-        msg.position.y = np.mean(self.y_app_setpoint_app)
-        msg.position.z = self.flight_height
-        msg.orientation = OffboardControl.dock_pose.orientation
-
-        rospy.loginfo(f"Approaching Marker: {msg.position.x}, Y: {msg.position.y}")
-
-        self.update_setpoint_smooth(msg, trajectory_type="approach")
-        rospy.loginfo("Starting smooth approach to marker")
 
     def set_finapp_setpoint(self):
         if not self.offapp_flag:
@@ -585,27 +343,6 @@ class DroneState:
 
         self.update_setpoint(msg)
         rospy.loginfo("Final Approach...")
-
-    def set_finapp_setpoint_smooth(self):
-        """New smooth final approach setpoint"""
-        if not self.offapp_flag:
-            self.x_app = np.mean(self.x_app_setpoint_app)
-            self.y_app = np.mean(self.y_app_setpoint_app)
-            self.offapp_flag = True
-            
-        msg = Pose()
-        msg.position.x = self.x_app + OffboardControl.dock_pose.position.x
-        msg.position.y = self.y_app + OffboardControl.dock_pose.position.y
-        msg.position.z = self.flight_height
-        msg.orientation = OffboardControl.dock_pose.orientation
-
-        self.final_x_sp = self.x_app + OffboardControl.dock_pose.position.x
-        self.final_y_sp = self.y_app + OffboardControl.dock_pose.position.y
-
-        rospy.loginfo(f"Final Marker App: {msg.position.x}, Y: {msg.position.y}")
-
-        self.update_setpoint_smooth(msg, trajectory_type="final_approach")
-        rospy.loginfo("Starting smooth final approach...")
     
     def offapp_check(self):
         return self.offapp_flag
@@ -623,8 +360,7 @@ class DroneState:
         drone_land = False
 
         self.final_setpoint.position.z -= 0.085
-        # self.update_setpoint(self.final_setpoint)
-        self.update_setpoint_smooth(self.final_setpoint, trajectory_type="landing")
+        self.update_setpoint(self.final_setpoint)
 
         rospy.loginfo(f"Landing Setpoint Z: {self.final_setpoint.position.z}")
 
@@ -647,10 +383,6 @@ class DroneState:
                 return True
             
         return False
-    
-    def trajectory_progress(self):
-        """Get current trajectory progress for debugging"""
-        return self.smooth_trajectory.get_trajectory_progress()
 
 class OffboardControl:
     current_state = State()
@@ -678,8 +410,8 @@ class OffboardControl:
         self.homeSetPos = False
         self.mag_status = FG40Feedback()
 
-        self.sp_pub_rate = MissionConfig.SETPOINT_RATE_HZ
-        self.control_rate = MissionConfig.CONTROL_RATE_HZ
+        self.sp_pub_rate = 60
+        self.control_rate = 1.5
         #self.rate = rospy.Rate(self.rate_hz)
 
         OffboardControl.stop_pub_thread = threading.Event()
@@ -732,14 +464,14 @@ class OffboardControl:
             "SEARCH",
             {
                 'name': 'SCAN',
-                'timeout': 5.0,
+                'timeout': 15.0,
                 'on_timeout': 'scan_time'
             },
             "APPROACH",
             "FINAPP",
             {
                 'name': 'PREP_LAND',
-                'timeout': 5.0,
+                'timeout': 15.0,
                 'on_timeout': 'land_time'
             },
             "LAND",
@@ -771,7 +503,7 @@ class OffboardControl:
             "trs_next",
             "ARM",
             "TAKEOFF",
-            prepare=["set_takeoff_setpoint_smooth"],
+            prepare=["set_takeoff_setpoint"],
             conditions=lambda: OffboardControl.current_state.mode
             == State.MODE_PX4_OFFBOARD
             #== VehicleStatus.NAVIGATION_STATE_OFFBOARD
@@ -787,17 +519,17 @@ class OffboardControl:
         )
         # self.machine.add_transition('trs_next', 'FAILSAFE', 'FAILSAFE')
         self.machine.add_transition(
-            "trs_next", "TAKEOFF", "LOITER", conditions=["setpoint_check_smooth"]
+            "trs_next", "TAKEOFF", "LOITER", conditions=["setpoint_check"]
         )
 
         self.machine.add_transition(
-            "trs_next", "LOITER", "SEARCH", conditions=["setpoint_check_smooth"]
+            "trs_next", "LOITER", "SEARCH", conditions=["setpoint_check"]
         )
         self.machine.add_transition(
             "trs_next",
             "SEARCH",
             "SCAN",
-            conditions=["setpoint_check_smooth", "attitude_check"],
+            conditions=["setpoint_check", "attitude_check"],
         )
 
         # Perform moving avg?
@@ -805,7 +537,7 @@ class OffboardControl:
             "trs_next",
             "SCAN",
             "APPROACH",
-            before=["set_approach_setpoint_smooth"],
+            before=["set_approach_setpoint"],
             conditions=["scan_time_check", "scan_check", "distance_check", "marker_found"],
         )
         # Perform another scan?
@@ -813,7 +545,7 @@ class OffboardControl:
             "trs_next",
             "APPROACH",
             "SCAN",
-            conditions=["setpoint_check_smooth", "attitude_check"],
+            conditions=["setpoint_check", "attitude_check"],
         )
 
         # Abort landing manuver if fiducial is not found > 3 times
@@ -830,14 +562,14 @@ class OffboardControl:
             "ABORT",
             "LAND",
             prepare=["set_final_setpoint"],
-            conditions=["land_time_check", "setpoint_check_smooth", "attitude_check"],
+            conditions=["land_time_check", "setpoint_check", "attitude_check"],
         )
 
         self.machine.add_transition(
             "trs_next",
             "SCAN",
             "FINAPP",
-            before=["set_finapp_setpoint_smooth"],
+            before=["set_finapp_setpoint"],
             conditions=["scan_time_check", "scan_check", "marker_found"],
             unless=["distance_check"],
         )
@@ -846,7 +578,7 @@ class OffboardControl:
             "trs_next",
             "FINAPP",
             "PREP_LAND",
-            conditions=["setpoint_check_smooth", "attitude_check"],
+            conditions=["setpoint_check", "attitude_check"],
         )
 
         self.machine.add_transition(
@@ -854,7 +586,7 @@ class OffboardControl:
             "PREP_LAND",
             "LAND",
             prepare=["set_final_setpoint"],
-            conditions=["land_time_check", "setpoint_check_smooth", "attitude_check"],
+            conditions=["land_time_check", "setpoint_check", "attitude_check"],
         )
         self.machine.add_transition(
             "trs_next", "LAND", "DISARM", conditions=["landing_check"]
@@ -933,9 +665,9 @@ class OffboardControl:
                     marker_position = marker.pose.pose.position
 
                     with OffboardControl.offboard_lock:
-                        if (len(OffboardControl.marker_window) < MissionConfig.MOVING_AVG_WINDOW):
+                        if (len(OffboardControl.marker_window) < 20):
                             OffboardControl.marker_window.append(marker_position)
-                        elif (len(OffboardControl.marker_window) == MissionConfig.MOVING_AVG_WINDOW):
+                        elif (len(OffboardControl.marker_window) == 20):
                             OffboardControl.marker_window.pop(0)
                             OffboardControl.marker_window.append(marker_position)
 
@@ -975,32 +707,10 @@ class OffboardControl:
         return resp.success
 
 
-    # def trajectory_setpoint_publisher(self):
-    #     rate = rospy.Rate(self.sp_pub_rate)
-        
-    #     while not rospy.is_shutdown() and not OffboardControl.stop_pub_thread.is_set():
-    #         msg = PoseStamped()
-    #         msg.pose = OffboardControl.target_pose
-    #         self.setpoint_publisher.publish(msg)
-
-    #         if OffboardControl.offboard_counter <= 100:
-    #             OffboardControl.offboard_counter += 1
-
-    #         rate.sleep()
-
     def trajectory_setpoint_publisher(self):
-        """Enhanced publisher that handles smooth trajectory updates"""
         rate = rospy.Rate(self.sp_pub_rate)
         
         while not rospy.is_shutdown() and not OffboardControl.stop_pub_thread.is_set():
-            # Update smooth trajectory (this modifies OffboardControl.target_pose)
-            trajectory_complete = self.droneState.smooth_trajectory.update_smooth_trajectory()
-            
-            # Handle trajectory completion
-            if trajectory_complete:
-                self.droneState.trajectory_complete = True
-            
-            # Publish current setpoint (now smoothly interpolated)
             msg = PoseStamped()
             msg.pose = OffboardControl.target_pose
             self.setpoint_publisher.publish(msg)
@@ -1009,6 +719,7 @@ class OffboardControl:
                 OffboardControl.offboard_counter += 1
 
             rate.sleep()
+
 
     def magnet_publisher(self, cmd):
         msg = FG40MagnetCmd()
@@ -1023,33 +734,11 @@ class OffboardControl:
             msg.cmd_magnet = 0
             self.magnet_cmd_pub.publish(msg)
 
-    # def state_parser(self):
-    #     """Launch State thread, to enter offboard control loop. ARM state will start the setpoint publisher thread."""
-    #     rate = rospy.Rate(self.control_rate)
-    #     while not rospy.is_shutdown():
-    #         rospy.loginfo(f"CURRENT STATE: {self.droneState.state}")
-    #         self.droneState.trs_next()
-            
-    #         if self.droneState.state == "DISARM":
-    #             rospy.loginfo("Magnetizing FG40...")
-    #             self.magnet_publisher("mag")
-    #             self.magnet_publisher("mag")
-    #             self.disarm()
-
-    #         rate.sleep()
-
     def state_parser(self):
-        """Enhanced state parser with trajectory progress logging"""
+        """Launch State thread, to enter offboard control loop. ARM state will start the setpoint publisher thread."""
         rate = rospy.Rate(self.control_rate)
         while not rospy.is_shutdown():
-            progress = self.droneState.trajectory_progress()
-            
-            # Enhanced logging with trajectory info
-            if self.droneState.smooth_trajectory.is_trajectory_active():
-                rospy.loginfo(f"STATE: {self.droneState.state} | Trajectory: {progress:.1%} active")
-            else:
-                rospy.loginfo(f"STATE: {self.droneState.state} | Trajectory: complete")
-            
+            rospy.loginfo(f"CURRENT STATE: {self.droneState.state}")
             self.droneState.trs_next()
             
             if self.droneState.state == "DISARM":
@@ -1064,3 +753,5 @@ class OffboardControl:
 if __name__ == '__main__':
     controller = OffboardControl()
     controller.state_parser()
+
+

@@ -35,6 +35,7 @@
   -->
 
   <!-- Include the standard PX4+MAVROS SITL wrapper -->
+  <param name="/use_sim_time" value="true"/>
   <include file="$(find px4)/launch/mavros_posix_sitl.launch">
     <arg name="x"       value="$(arg x)"/>
     <arg name="y"       value="$(arg y)"/>
@@ -46,6 +47,7 @@
     <arg name="vehicle" value="$(arg vehicle)"/>
     <arg name="world"   value="$(arg world)"/>
     <arg name="sdf"     value="$(arg sdf)"/>
+    <param name="conn/timesync_mode" value="MAVLINK"/>
   </include>
 
   <include file="$(find aruco_ros)/launch/gz_marker_publisher.launch">

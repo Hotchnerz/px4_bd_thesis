@@ -1,0 +1,1140 @@
+[INFO] [1759520028.021081]: Spot @ 192.168.80.3 auth successful
+[INFO] [1759520028.372688]: State client created... Entering ROS Timer callback
+[INFO] [1759520028.508603]: THIS LEASE BELONGS TO 192.168.80.3 NOW!
+power_state {
+  motor_power_state: STATE_ON
+  shore_power_state: STATE_OFF_SHORE_POWER
+  locomotion_charge_percentage {
+    value: 38.0
+  }
+  locomotion_estimated_runtime {
+    seconds: 2160
+    nanos: 598876953
+  }
+  robot_power_state: ROBOT_POWER_STATE_ON
+  payload_ports_power_state: PAYLOAD_PORTS_POWER_STATE_ON
+  wifi_radio_power_state: WIFI_RADIO_POWER_STATE_ON
+}
+battery_states {
+  identifier: "a2-21319-0004"
+  charge_percentage {
+    value: 38.0
+  }
+  estimated_runtime {
+    seconds: 2160
+    nanos: 598876953
+  }
+  current {
+    value: -8.407999992370605
+  }
+  voltage {
+    value: 50.12000274658203
+  }
+  temperatures: 37.88888931274414
+  temperatures: 37.89259338378906
+  temperatures: 37.47037124633789
+  temperatures: 37.685184478759766
+  temperatures: 36.25925827026367
+  temperatures: 38.27407455444336
+  temperatures: 37.58518600463867
+  temperatures: 36.97037124633789
+  temperatures: 36.98518371582031
+  temperatures: 36.7185173034668
+  status: STATUS_DISCHARGING
+}
+comms_states {
+  timestamp {
+    seconds: 1759520357
+    nanos: 282750177
+  }
+  wifi_state {
+    current_mode: MODE_ACCESS_POINT
+  }
+}
+comms_states {
+  timestamp {
+    seconds: 1759520357
+    nanos: 282750177
+  }
+}
+comms_states {
+  timestamp {
+  }
+}
+system_fault_state {
+}
+estop_states {
+  timestamp {
+    seconds: 1759520357
+    nanos: 790684928
+  }
+  name: "hardware_estop"
+  type: TYPE_HARDWARE
+  state: STATE_NOT_ESTOPPED
+}
+estop_states {
+  timestamp {
+    seconds: 1759520357
+    nanos: 790684928
+  }
+  name: "payload_estop"
+  type: TYPE_HARDWARE
+  state: STATE_NOT_ESTOPPED
+}
+estop_states {
+  timestamp {
+    seconds: 1759520357
+    nanos: 790684928
+  }
+  name: "software_estop"
+  type: TYPE_SOFTWARE
+  state: STATE_NOT_ESTOPPED
+}
+kinematic_state {
+  joint_states {
+    name: "fl.hx"
+    position {
+      value: 0.1628016233444214
+    }
+    velocity {
+      value: -0.005337565205991268
+    }
+    acceleration {
+      value: 0.03354015573859215
+    }
+    load {
+      value: -15.733407974243164
+    }
+  }
+  joint_states {
+    name: "fl.hy"
+    position {
+      value: 1.1320016384124756
+    }
+    velocity {
+      value: 0.007145262323319912
+    }
+    acceleration {
+      value: 2.770768165588379
+    }
+    load {
+      value: 0.6448086500167847
+    }
+  }
+  joint_states {
+    name: "fl.kn"
+    position {
+      value: -1.9844660758972168
+    }
+    velocity {
+      value: 0.049079157412052155
+    }
+    acceleration {
+      value: 5.030430316925049
+    }
+    load {
+      value: 29.147533416748047
+    }
+  }
+  joint_states {
+    name: "fr.hx"
+    position {
+      value: -0.16010618209838867
+    }
+    velocity {
+      value: 0.001622812356799841
+    }
+    acceleration {
+      value: -3.3936405181884766
+    }
+    load {
+      value: 15.620304107666016
+    }
+  }
+  joint_states {
+    name: "fr.hy"
+    position {
+      value: 1.1480739116668701
+    }
+    velocity {
+      value: -0.004690896719694138
+    }
+    acceleration {
+      value: -0.8441592454910278
+    }
+    load {
+      value: 0.27652326226234436
+    }
+  }
+  joint_states {
+    name: "fr.kn"
+    position {
+      value: -2.002857208251953
+    }
+    velocity {
+      value: -0.008844541385769844
+    }
+    acceleration {
+      value: 4.043705463409424
+    }
+    load {
+      value: 28.992238998413086
+    }
+  }
+  joint_states {
+    name: "hl.hx"
+    position {
+      value: 0.18446630239486694
+    }
+    velocity {
+      value: 0.004146192222833633
+    }
+    acceleration {
+      value: 0.9109432697296143
+    }
+    load {
+      value: -19.058483123779297
+    }
+  }
+  joint_states {
+    name: "hl.hy"
+    position {
+      value: 1.1058266162872314
+    }
+    velocity {
+      value: -0.002238773973658681
+    }
+    acceleration {
+      value: -0.2219225913286209
+    }
+    load {
+      value: 0.35255372524261475
+    }
+  }
+  joint_states {
+    name: "hl.kn"
+    position {
+      value: -1.9725947380065918
+    }
+    velocity {
+      value: -0.04241754487156868
+    }
+    acceleration {
+      value: 4.097747802734375
+    }
+    load {
+      value: 32.09788513183594
+    }
+  }
+  joint_states {
+    name: "hr.hx"
+    position {
+      value: -0.18242263793945312
+    }
+    velocity {
+      value: -0.0007724033785052598
+    }
+    acceleration {
+      value: -0.49081578850746155
+    }
+    load {
+      value: 18.675079345703125
+    }
+  }
+  joint_states {
+    name: "hr.hy"
+    position {
+      value: 1.1247527599334717
+    }
+    velocity {
+      value: -0.0008566679898649454
+    }
+    acceleration {
+      value: -0.9716109037399292
+    }
+    load {
+      value: 0.24634906649589539
+    }
+  }
+  joint_states {
+    name: "hr.kn"
+    position {
+      value: -2.0008935928344727
+    }
+    velocity {
+      value: -0.03169386088848114
+    }
+    acceleration {
+      value: 7.709909439086914
+    }
+    load {
+      value: 32.104434967041016
+    }
+  }
+  joint_states {
+    name: "arm0.sh0"
+    position {
+      value: 0.0009694099426269531
+    }
+    velocity {
+      value: -0.026363782584667206
+    }
+    acceleration {
+      value: -0.35446852445602417
+    }
+    load {
+      value: -1.150026559829712
+    }
+  }
+  joint_states {
+    name: "arm0.sh1"
+    position {
+      value: -3.119668960571289
+    }
+    velocity {
+      value: 0.017095897346735
+    }
+    acceleration {
+      value: -0.4892633259296417
+    }
+    load {
+      value: 3.2136549949645996
+    }
+  }
+  joint_states {
+    name: "arm0.el0"
+    position {
+      value: 3.1405863761901855
+    }
+    velocity {
+      value: 0.0026299823075532913
+    }
+    acceleration {
+      value: -2.559574842453003
+    }
+    load {
+      value: 1.8257522583007812
+    }
+  }
+  joint_states {
+    name: "arm0.el1"
+    position {
+      value: 1.5694373846054077
+    }
+    velocity {
+      value: 0.010092846117913723
+    }
+    acceleration {
+      value: -2.5736050605773926
+    }
+    load {
+      value: 0.037452299147844315
+    }
+  }
+  joint_states {
+    name: "arm0.wr0"
+    position {
+      value: 0.0005322694778442383
+    }
+    velocity {
+      value: 0.02682739682495594
+    }
+    acceleration {
+      value: 4.738822937011719
+    }
+    load {
+      value: -0.02713284082710743
+    }
+  }
+  joint_states {
+    name: "arm0.wr1"
+    position {
+      value: -1.5697882175445557
+    }
+    velocity {
+      value: -0.0011964596342295408
+    }
+    acceleration {
+      value: -0.15026560425758362
+    }
+    load {
+      value: 0.012960711494088173
+    }
+  }
+  joint_states {
+    name: "arm0.f1x"
+    position {
+      value: -0.01636064052581787
+    }
+    velocity {
+      value: 0.04723628610372543
+    }
+    acceleration {
+      value: -3.3393101692199707
+    }
+    load {
+      value: 0.1528230905532837
+    }
+  }
+  velocity_of_body_in_vision {
+    linear {
+      x: -0.0006376943783834577
+      y: -0.0010167951695621014
+      z: -0.00021054760145489126
+    }
+    angular {
+      x: -7.418944733217359e-05
+      y: -0.00028101273346692324
+      z: -0.0017103733262047172
+    }
+  }
+  velocity_of_body_in_odom {
+    linear {
+      x: 0.0003150419797748327
+      y: -0.0011581372236832976
+      z: -0.0002105489547830075
+    }
+    angular {
+      x: 0.0001562581746838987
+      y: -0.0002450623142067343
+      z: -0.0017103733262047172
+    }
+  }
+  acquisition_timestamp {
+    seconds: 1759520357
+    nanos: 790684928
+  }
+  transforms_snapshot {
+    child_to_parent_edge_map {
+      key: "arm0.link_wr1"
+      value {
+        parent_frame_name: "body"
+        parent_tform_child {
+          position {
+            x: 0.35836178064346313
+            y: 6.433177622966468e-05
+            z: 0.26196879148483276
+          }
+          rotation {
+            x: -0.00017769302939996123
+            y: 0.010458746924996376
+            z: 0.0007526330300606787
+            w: 0.9999449849128723
+          }
+        }
+      }
+    }
+    child_to_parent_edge_map {
+      key: "body"
+      value {
+        parent_tform_child {
+          position {
+          }
+          rotation {
+            w: 1.0
+          }
+        }
+      }
+    }
+    child_to_parent_edge_map {
+      key: "feet_center"
+      value {
+        parent_frame_name: "body"
+        parent_tform_child {
+          position {
+            x: -0.02164936065673828
+            y: 0.00101470947265625
+            z: -0.3879556655883789
+          }
+          rotation {
+            x: 0.0006696104537695646
+            y: 0.003999762237071991
+            z: -0.000137024384457618
+            w: 0.999991774559021
+          }
+        }
+      }
+    }
+    child_to_parent_edge_map {
+      key: "flat_body"
+      value {
+        parent_frame_name: "body"
+        parent_tform_child {
+          position {
+          }
+          rotation {
+            x: 0.0006701690726913512
+            y: 0.003999669104814529
+            z: 2.6201871605735505e-06
+            w: 0.9999917149543762
+          }
+        }
+      }
+    }
+    child_to_parent_edge_map {
+      key: "gpe"
+      value {
+        parent_frame_name: "odom"
+        parent_tform_child {
+          position {
+            x: 17.53725242614746
+            y: 3.320024251937866
+            z: 4.136371612548828
+          }
+          rotation {
+            x: -0.007172532379627228
+            y: 0.0016417510341852903
+            z: -1.1775831808336079e-05
+            w: 0.999972939491272
+          }
+        }
+      }
+    }
+    child_to_parent_edge_map {
+      key: "hand"
+      value {
+        parent_frame_name: "body"
+        parent_tform_child {
+          position {
+            x: 0.5538887977600098
+            y: 0.00035797356395050883
+            z: 0.2578781247138977
+          }
+          rotation {
+            x: -0.00017769302939996123
+            y: 0.010458746924996376
+            z: 0.0007526330300606787
+            w: 0.9999449849128723
+          }
+        }
+      }
+    }
+    child_to_parent_edge_map {
+      key: "link_wr1"
+      value {
+        parent_frame_name: "body"
+        parent_tform_child {
+          position {
+            x: 0.35836178064346313
+            y: 6.433177622966468e-05
+            z: 0.26196879148483276
+          }
+          rotation {
+            x: -0.00017769302939996123
+            y: 0.010458746924996376
+            z: 0.0007526330300606787
+            w: 0.9999449849128723
+          }
+        }
+      }
+    }
+    child_to_parent_edge_map {
+      key: "odom"
+      value {
+        parent_frame_name: "body"
+        parent_tform_child {
+          position {
+            x: -12.930824279785156
+            y: -12.334872245788574
+            z: -4.437628746032715
+          }
+          rotation {
+            x: 0.001779235783033073
+            y: 0.003644282929599285
+            z: 0.28419890999794006
+            w: 0.9587567448616028
+          }
+        }
+      }
+    }
+    child_to_parent_edge_map {
+      key: "vision"
+      value {
+        parent_frame_name: "body"
+        parent_tform_child {
+          position {
+            x: -12.756326675415039
+            y: -12.121077537536621
+            z: 0.06215860694646835
+          }
+          rotation {
+            x: 0.0030919716227799654
+            y: 0.0026241561863571405
+            z: 0.6450120806694031
+            w: 0.7641617059707642
+          }
+        }
+      }
+    }
+  }
+}
+behavior_fault_state {
+}
+foot_state {
+  foot_position_rt_body {
+    x: 0.2729264497756958
+    y: 0.23166882991790771
+    z: -0.3910810649394989
+  }
+  contact: CONTACT_MADE
+  terrain {
+    ground_mu_est: 0.6000000238418579
+    frame_name: "odom"
+    foot_slip_distance_rt_frame {
+      x: 1.1462946531537455e-05
+      y: -3.970749276049901e-06
+      z: 1.9321875655009535e-08
+    }
+    foot_slip_velocity_rt_frame {
+      x: -0.001902648014947772
+      y: 0.0006562552298419178
+      z: -3.1665279038861627e-06
+    }
+    ground_contact_normal_rt_frame {
+      x: 0.003283581929281354
+      y: 0.014344637282192707
+      z: 0.9998917579650879
+    }
+  }
+}
+foot_state {
+  foot_position_rt_body {
+    x: 0.27100276947021484
+    y: -0.22980037331581116
+    z: -0.3865172564983368
+  }
+  contact: CONTACT_MADE
+  terrain {
+    ground_mu_est: 0.6000000238418579
+    frame_name: "odom"
+    foot_slip_distance_rt_frame {
+      x: -1.5263674868037924e-05
+      y: -2.577054692665115e-05
+      z: 4.1983395249189925e-07
+    }
+    foot_slip_velocity_rt_frame {
+      x: -0.00255426368676126
+      y: -0.006485966499894857
+      z: 0.00010143678082386032
+    }
+    ground_contact_normal_rt_frame {
+      x: 0.003283581929281354
+      y: 0.014344637282192707
+      z: 0.9998917579650879
+    }
+  }
+}
+foot_state {
+  foot_position_rt_body {
+    x: -0.3148898482322693
+    y: 0.24075847864151
+    z: -0.39069461822509766
+  }
+  contact: CONTACT_MADE
+  terrain {
+    ground_mu_est: 0.6000000238418579
+    frame_name: "odom"
+    foot_slip_distance_rt_frame {
+      x: 1.1478960914246272e-05
+      y: -1.1530180927366018e-05
+      z: 1.2771866408911592e-07
+    }
+    foot_slip_velocity_rt_frame {
+      x: -0.0031518638134002686
+      y: 0.0031380231957882643
+      z: -3.466725320322439e-05
+    }
+    ground_contact_normal_rt_frame {
+      x: 0.003283581929281354
+      y: 0.014344637282192707
+      z: 0.9998917579650879
+    }
+  }
+}
+foot_state {
+  foot_position_rt_body {
+    x: -0.31563183665275574
+    y: -0.23856812715530396
+    z: -0.38353022933006287
+  }
+  contact: CONTACT_MADE
+  terrain {
+    ground_mu_est: 0.6000000238418579
+    frame_name: "odom"
+    foot_slip_distance_rt_frame {
+      x: 8.175494258466642e-06
+      y: -1.0403829037386458e-05
+      z: -5.060868701889376e-08
+    }
+    foot_slip_velocity_rt_frame {
+      x: -0.006143944337964058
+      y: 0.0025909068062901497
+      z: 0.00011739711771951988
+    }
+    ground_contact_normal_rt_frame {
+      x: 0.02549903094768524
+      y: 0.01517555397003889
+      z: 0.9995595812797546
+    }
+  }
+}
+service_fault_state {
+  historical_faults {
+    fault_id {
+      fault_name: "ServiceLivenessFault"
+      service_name: "spot-cam-health"
+      payload_guid: "120551c0-760d-11e8-954b-48b02d0fec64"
+    }
+    error_message: "Service Liveness Fault: spot-cam-health has timed out."
+    severity: SEVERITY_CRITICAL
+    onset_timestamp {
+      seconds: 1759516691
+      nanos: 268366465
+    }
+    duration {
+      seconds: 6
+      nanos: 39463838
+    }
+  }
+  historical_faults {
+    fault_id {
+      fault_name: "ServiceLivenessFault"
+      service_name: "spot-cam-power"
+      payload_guid: "120551c0-760d-11e8-954b-48b02d0fec64"
+    }
+    error_message: "Service Liveness Fault: spot-cam-power has timed out."
+    severity: SEVERITY_CRITICAL
+    onset_timestamp {
+      seconds: 1759516691
+      nanos: 269753152
+    }
+    duration {
+      seconds: 6
+      nanos: 38455190
+    }
+  }
+  historical_faults {
+    fault_id {
+      fault_name: "ServiceLivenessFault"
+      service_name: "spot-cam-ptz"
+      payload_guid: "120551c0-760d-11e8-954b-48b02d0fec64"
+    }
+    error_message: "Service Liveness Fault: spot-cam-ptz has timed out."
+    severity: SEVERITY_CRITICAL
+    onset_timestamp {
+      seconds: 1759516691
+      nanos: 270303880
+    }
+    duration {
+      seconds: 6
+      nanos: 38312902
+    }
+  }
+  historical_faults {
+    fault_id {
+      fault_name: "ServiceLivenessFault"
+      service_name: "spot-cam-ptz-configuration"
+      payload_guid: "120551c0-760d-11e8-954b-48b02d0fec64"
+    }
+    error_message: "Service Liveness Fault: spot-cam-ptz-configuration has timed out."
+    severity: SEVERITY_CRITICAL
+    onset_timestamp {
+      seconds: 1759516691
+      nanos: 270831570
+    }
+    duration {
+      seconds: 6
+      nanos: 38146223
+    }
+  }
+  historical_faults {
+    fault_id {
+      fault_name: "ServiceLivenessFault"
+      service_name: "spot-cam-version"
+      payload_guid: "120551c0-760d-11e8-954b-48b02d0fec64"
+    }
+    error_message: "Service Liveness Fault: spot-cam-version has timed out."
+    severity: SEVERITY_CRITICAL
+    onset_timestamp {
+      seconds: 1759516691
+      nanos: 271492832
+    }
+    duration {
+      seconds: 6
+      nanos: 38000970
+    }
+  }
+  historical_faults {
+    fault_id {
+      fault_name: "ServiceLivenessFault"
+      service_name: "spot-cam-media-log"
+      payload_guid: "120551c0-760d-11e8-954b-48b02d0fec64"
+    }
+    error_message: "Service Liveness Fault: spot-cam-media-log has timed out."
+    severity: SEVERITY_CRITICAL
+    onset_timestamp {
+      seconds: 1759518239
+      nanos: 385632434
+    }
+    duration {
+      seconds: 1
+      nanos: 6683353
+    }
+  }
+  historical_faults {
+    fault_id {
+      fault_name: "ServiceLivenessFault"
+      service_name: "spot-cam-network"
+      payload_guid: "120551c0-760d-11e8-954b-48b02d0fec64"
+    }
+    error_message: "Service Liveness Fault: spot-cam-network has timed out."
+    severity: SEVERITY_CRITICAL
+    onset_timestamp {
+      seconds: 1759518239
+      nanos: 386949130
+    }
+    duration {
+      seconds: 1
+      nanos: 6546598
+    }
+  }
+  historical_faults {
+    fault_id {
+      fault_name: "ServiceLivenessFault"
+      service_name: "spot-cam-version"
+      payload_guid: "120551c0-760d-11e8-954b-48b02d0fec64"
+    }
+    error_message: "Service Liveness Fault: spot-cam-version has timed out."
+    severity: SEVERITY_CRITICAL
+    onset_timestamp {
+      seconds: 1759518239
+      nanos: 388393381
+    }
+    duration {
+      seconds: 1
+      nanos: 5647098
+    }
+  }
+  historical_faults {
+    fault_id {
+      fault_name: "ServiceLivenessFault"
+      service_name: "spot-cam-version"
+      payload_guid: "120551c0-760d-11e8-954b-48b02d0fec64"
+    }
+    error_message: "Service Liveness Fault: spot-cam-version has timed out."
+    severity: SEVERITY_CRITICAL
+    onset_timestamp {
+      seconds: 1759509668
+      nanos: 126474572
+    }
+    duration {
+      seconds: 8
+      nanos: 40166254
+    }
+  }
+  historical_faults {
+    fault_id {
+      fault_name: "ServiceLivenessFault"
+      service_name: "spot-cam-media-log"
+      payload_guid: "120551c0-760d-11e8-954b-48b02d0fec64"
+    }
+    error_message: "Service Liveness Fault: spot-cam-media-log has timed out."
+    severity: SEVERITY_CRITICAL
+    onset_timestamp {
+      seconds: 1759509673
+      nanos: 150205889
+    }
+    duration {
+      seconds: 3
+      nanos: 16717397
+    }
+  }
+  historical_faults {
+    fault_id {
+      fault_name: "ServiceLivenessFault"
+      service_name: "spot-cam-camera-configuration"
+      payload_guid: "120551c0-760d-11e8-954b-48b02d0fec64"
+    }
+    error_message: "Service Liveness Fault: spot-cam-camera-configuration has timed out."
+    severity: SEVERITY_CRITICAL
+    onset_timestamp {
+      seconds: 1759516690
+      nanos: 261006278
+    }
+    duration {
+      seconds: 7
+      nanos: 42592681
+    }
+  }
+  historical_faults {
+    fault_id {
+      fault_name: "ServiceLivenessFault"
+      service_name: "spot-cam-image"
+      payload_guid: "120551c0-760d-11e8-954b-48b02d0fec64"
+    }
+    error_message: "Service Liveness Fault: spot-cam-image has timed out."
+    severity: SEVERITY_CRITICAL
+    onset_timestamp {
+      seconds: 1759516690
+      nanos: 261547545
+    }
+    duration {
+      seconds: 7
+      nanos: 42739667
+    }
+  }
+  historical_faults {
+    fault_id {
+      fault_name: "ServiceLivenessFault"
+      service_name: "spot-cam-lighting"
+      payload_guid: "120551c0-760d-11e8-954b-48b02d0fec64"
+    }
+    error_message: "Service Liveness Fault: spot-cam-lighting has timed out."
+    severity: SEVERITY_CRITICAL
+    onset_timestamp {
+      seconds: 1759516690
+      nanos: 262071683
+    }
+    duration {
+      seconds: 7
+      nanos: 42681487
+    }
+  }
+  historical_faults {
+    fault_id {
+      fault_name: "ServiceLivenessFault"
+      service_name: "spot-cam-location"
+      payload_guid: "120551c0-760d-11e8-954b-48b02d0fec64"
+    }
+    error_message: "Service Liveness Fault: spot-cam-location has timed out."
+    severity: SEVERITY_CRITICAL
+    onset_timestamp {
+      seconds: 1759516690
+      nanos: 262680365
+    }
+    duration {
+      seconds: 7
+      nanos: 42481497
+    }
+  }
+  historical_faults {
+    fault_id {
+      fault_name: "ServiceLivenessFault"
+      service_name: "spot-cam-media-log"
+      payload_guid: "120551c0-760d-11e8-954b-48b02d0fec64"
+    }
+    error_message: "Service Liveness Fault: spot-cam-media-log has timed out."
+    severity: SEVERITY_CRITICAL
+    onset_timestamp {
+      seconds: 1759516690
+      nanos: 263254396
+    }
+    duration {
+      seconds: 7
+      nanos: 42268314
+    }
+  }
+  historical_faults {
+    fault_id {
+      fault_name: "ServiceLivenessFault"
+      service_name: "spot-cam-network"
+      payload_guid: "120551c0-760d-11e8-954b-48b02d0fec64"
+    }
+    error_message: "Service Liveness Fault: spot-cam-network has timed out."
+    severity: SEVERITY_CRITICAL
+    onset_timestamp {
+      seconds: 1759516690
+      nanos: 263818693
+    }
+    duration {
+      seconds: 7
+      nanos: 42084949
+    }
+  }
+  historical_faults {
+    fault_id {
+      fault_name: "ServiceLivenessFault"
+      service_name: "spot-cam-stream-quality"
+      payload_guid: "120551c0-760d-11e8-954b-48b02d0fec64"
+    }
+    error_message: "Service Liveness Fault: spot-cam-stream-quality has timed out."
+    severity: SEVERITY_CRITICAL
+    onset_timestamp {
+      seconds: 1759516690
+      nanos: 264413794
+    }
+    duration {
+      seconds: 7
+      nanos: 41869553
+    }
+  }
+  historical_faults {
+    fault_id {
+      fault_name: "ServiceLivenessFault"
+      service_name: "spot-cam-audio"
+      payload_guid: "120551c0-760d-11e8-954b-48b02d0fec64"
+    }
+    error_message: "Service Liveness Fault: spot-cam-audio has timed out."
+    severity: SEVERITY_CRITICAL
+    onset_timestamp {
+      seconds: 1759516691
+      nanos: 266101389
+    }
+    duration {
+      seconds: 6
+      nanos: 40625240
+    }
+  }
+  historical_faults {
+    fault_id {
+      fault_name: "ServiceLivenessFault"
+      service_name: "spot-cam-compositor"
+      payload_guid: "120551c0-760d-11e8-954b-48b02d0fec64"
+    }
+    error_message: "Service Liveness Fault: spot-cam-compositor has timed out."
+    severity: SEVERITY_CRITICAL
+    onset_timestamp {
+      seconds: 1759516691
+      nanos: 266987747
+    }
+    duration {
+      seconds: 6
+      nanos: 40098106
+    }
+  }
+  historical_faults {
+    fault_id {
+      fault_name: "ServiceLivenessFault"
+      service_name: "spot-cam-factory-reset"
+      payload_guid: "120551c0-760d-11e8-954b-48b02d0fec64"
+    }
+    error_message: "Service Liveness Fault: spot-cam-factory-reset has timed out."
+    severity: SEVERITY_CRITICAL
+    onset_timestamp {
+      seconds: 1759516691
+      nanos: 267696657
+    }
+    duration {
+      seconds: 6
+      nanos: 39790447
+    }
+  }
+}
+manipulator_state {
+  stow_state: STOWSTATE_STOWED
+  gripper_open_percentage: 1.0420799255371094
+  estimated_end_effector_force_in_hand {
+    x: 7.649465560913086
+    y: 2.4868669509887695
+    z: 18.61252784729004
+  }
+  velocity_of_hand_in_vision {
+    linear {
+      x: -0.0030459840781986713
+      y: -0.0028252447955310345
+      z: -0.006192711181938648
+    }
+    angular {
+      x: 0.021000398322939873
+      y: -0.006261415779590607
+      z: -0.0013897493481636047
+    }
+  }
+  velocity_of_hand_in_odom {
+    linear {
+      x: 1.1508120223879814e-05
+      y: -0.004154503811150789
+      z: -0.006192712113261223
+    }
+    angular {
+      x: 0.018840931355953217
+      y: 0.01119112316519022
+      z: -0.0013897493481636047
+    }
+  }
+  carry_state: CARRY_STATE_NOT_CARRIABLE
+}
+terrain_state {
+}
+system_state {
+  motor_temperatures {
+    name: "fl.hxa"
+    temperature: 37.344749450683594
+  }
+  motor_temperatures {
+    name: "fl.hya"
+    temperature: 38.14264678955078
+  }
+  motor_temperatures {
+    name: "fl.kna"
+    temperature: 40.5817985534668
+  }
+  motor_temperatures {
+    name: "fr.hxa"
+    temperature: 38.05679702758789
+  }
+  motor_temperatures {
+    name: "fr.hya"
+    temperature: 36.22869873046875
+  }
+  motor_temperatures {
+    name: "fr.kna"
+    temperature: 39.026397705078125
+  }
+  motor_temperatures {
+    name: "hl.hxa"
+    temperature: 35.26919937133789
+  }
+  motor_temperatures {
+    name: "hl.hya"
+    temperature: 35.809547424316406
+  }
+  motor_temperatures {
+    name: "hl.kna"
+    temperature: 37.39524841308594
+  }
+  motor_temperatures {
+    name: "hr.hxa"
+    temperature: 35.784297943115234
+  }
+  motor_temperatures {
+    name: "hr.hya"
+    temperature: 35.511600494384766
+  }
+  motor_temperatures {
+    name: "hr.kna"
+    temperature: 38.80924987792969
+  }
+  motor_temperatures {
+    name: "arm0.sh0a"
+    temperature: 36.112548828125
+  }
+  motor_temperatures {
+    name: "arm0.sh1a"
+    temperature: 35.56209945678711
+  }
+  motor_temperatures {
+    name: "arm0.el0a"
+    temperature: 35.809547424316406
+  }
+  motor_temperatures {
+    name: "arm0.el1a"
+    temperature: 33.41484069824219
+  }
+  motor_temperatures {
+    name: "arm0.wr0a"
+    temperature: 39.917877197265625
+  }
+  motor_temperatures {
+    name: "arm0.wr1a"
+    temperature: 40.76865005493164
+  }
+  motor_temperatures {
+    name: "arm0.f1xa"
+    temperature: 40.45572280883789
+  }
+}
+behavior_state {
+  state: STATE_STANDING
+}
+

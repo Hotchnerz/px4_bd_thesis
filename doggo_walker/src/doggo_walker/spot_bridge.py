@@ -38,13 +38,17 @@ class SpotBodyPublisher:
         # self.bd_user = config.get("BOSDYN_CLIENT_USERNAME")
         # self.bd_pass = config.get("BOSDYN_CLIENT_PASSWORD")
 
-        self.hostname = "192.168.1.18"
-        self.bd_user = "admin"
-        self.bd_pass = "4aud2u39hgfd"
+        # self.hostname = "192.168.1.18"
+        # self.bd_user = "admin"
+        # self.bd_pass = "4aud2u39hgfd"
 
         # self.hostname = "192.168.1.76"
         # self.bd_user = "cio"
         # self.bd_pass = "ciociociocio"
+
+        self.hostname = "192.168.80.3"
+        self.bd_user = "cio"
+        self.bd_pass = "ciociociocio"
 
         self.sdk = bosdyn.client.create_standard_sdk("findSpot_melodic")
         self.robot = self.sdk.create_robot(self.hostname)
