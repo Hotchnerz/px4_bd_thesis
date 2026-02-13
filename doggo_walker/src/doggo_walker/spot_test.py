@@ -17,6 +17,8 @@ from bosdyn.api import trajectory_pb2
 from bosdyn.util import seconds_to_duration
 from bosdyn.api.spot import robot_command_pb2 as spot_command_pb2
 from bosdyn.api import basic_command_pb2
+from bosdyn.client.frame_helpers import (BODY_FRAME_NAME, ODOM_FRAME_NAME, VISION_FRAME_NAME,
+                                         get_se2_a_tform_b)
 # import tf2_ros
 # from tf.transformations import quaternion_from_euler, quaternion_multiply
 # from tf2_ros import TransformBroadcaster
@@ -82,11 +84,6 @@ class SpotBodyPublisher:
         self.timer = rospy.Timer(rospy.Duration(0.1), self.timer_callback)
 
     def get_creds(self):
-        # env_path = Path(__file__).resolve().parent / ".env"
-        # config = dotenv.dotenv_values(str(env_path))
-        # self.hostname = config.get("ROBOT_IP")
-        # self.bd_user = config.get("BOSDYN_CLIENT_USERNAME")
-        # self.bd_pass = config.get("BOSDYN_CLIENT_PASSWORD")
         return self.bd_user, self.bd_pass
 
     def connect(self):
@@ -136,7 +133,7 @@ class SpotBodyPublisher:
         msg.pose.orientation.w = map_tf_body.rotation.w
 
     
-    def takeoff_qc_prepare(self):
+    def prepare_spot(self):
 
         def check_stance_status(cmd):
             # cmd = basic_command_pb2.BatteryChangePoseCommand.Request.HINT_RIGHT
@@ -157,8 +154,8 @@ class SpotBodyPublisher:
         
         #### Example stance offsets from body position. ####
         #Seems like 0.2 offsets is the normal offsets
-        x_offset = 0.2
-        y_offset = 0.2
+        x_offset = 0.3
+        y_offset = 0.3
 
         pos_fl_rt_vision = vo_T_body * math_helpers.SE2Pose(x_offset, y_offset, 0)
         pos_fr_rt_vision = vo_T_body * math_helpers.SE2Pose(x_offset, -y_offset, 0)
@@ -168,8 +165,6 @@ class SpotBodyPublisher:
         stance_cmd = RobotCommandBuilder.stance_command(
             frame_helpers.VISION_FRAME_NAME, pos_fl_rt_vision.position, pos_fr_rt_vision.position,
             pos_hl_rt_vision.position, pos_hr_rt_vision.position)
-
-
 
         stance_cmd.synchronized_command.mobility_command.stance_request.end_time.CopyFrom(
             self.robot.time_sync.robot_timestamp_from_local_secs(time.time() + 5))
@@ -181,8 +176,6 @@ class SpotBodyPublisher:
         # print(test)
 
         blocking_command(self._command_client, stance_cmd, check_stance_status)
-
-        self.x500_undocking()
 
         # height_cmd= RobotCommandBuilder.synchro_stand_command(body_height= -0.5)
         ####NOT SURE IF I WANT TO GO LOWER AFTER PREPARING YET###
@@ -222,6 +215,9 @@ class SpotBodyPublisher:
         print(state)
     
     def stand(self):
+        blocking_stand(self._command_client, timeout_sec=10)
+
+    def zupvt_init(self):
         #Might want to look at the blocking robot_commands in documentation
         # height_cmd_1 = RobotCommandBuilder.synchro_stand_command(body_height= -0.5)
 
@@ -243,8 +239,7 @@ class SpotBodyPublisher:
         # nom_height = RobotCommandBuilder.synchro_stand_command(body_height= 0.0)
         # self._command_client.robot_command(nom_height)
 
-        blocking_stand(self._command_client, timeout_sec=10)
-
+        
         robot_state = self._state_client.get_robot_state()
 
         odom_T_flat_body = get_a_tform_b(robot_state.kinematic_state.transforms_snapshot,
@@ -292,49 +287,41 @@ class SpotBodyPublisher:
     def release_lease(self):
         self._lease_client.return_lease(self._lease)
 
-    def reset_pose(self):
-        stand_cmd = RobotCommandBuilder.synchro_stand_command(params=params)  
-        blocking_stand(command_client, cmd=stand_cmd, timeout_sec=10)
+    def revert_pose(self):
+        #Revert Stance
+        og_feet = self.nominal_pose
+        vo_T_body = frame_helpers.get_se2_a_tform_b(self.nominal_pose.kinematic_state.transforms_snapshot,
+                                                    frame_helpers.VISION_FRAME_NAME,
+                                                    frame_helpers.GRAV_ALIGNED_BODY_FRAME_NAME)
 
-        # def check_stance_status(cmd):
-        #     return cmd.feedback.synchronized_feedback.mobility_command_feedback.stance_feedback.status == basic_command_pb2.StanceCommand.Feedback.STATUS_STANCED
+        def check_stance_status(cmd):
+            return cmd.feedback.synchronized_feedback.mobility_command_feedback.stance_feedback.status == basic_command_pb2.StanceCommand.Feedback.STATUS_STANCED
 
-        # self.nominal_pose = self._state_client.get_robot_state()
-        # vo_T_body = frame_helpers.get_se2_a_tform_b(self.nominal_pose.kinematic_state.transforms_snapshot,
-        #                                             frame_helpers.VISION_FRAME_NAME,
-        #                                             frame_helpers.GRAV_ALIGNED_BODY_FRAME_NAME)
-        # #Nominal Spot Height = 0.413614684137 / -4.5770745277404785
-        # #Max Height = 0.502342052748 / -4.641268730163574
-        # #Min Height = 0.282637324592 / -4.437628746032715
-        
-        # #### Example stance offsets from body position. ####
-        # x_offset = 0.3
-        # y_offset = 0.3
+        # Need to transform from body frame to vision frame
+        pos_fl_rt_vision = vo_T_body * math_helpers.SE2Pose(og_feet.foot_state[0].foot_position_rt_body.x, og_feet.foot_state[0].foot_position_rt_body.y, 0)
+        pos_fr_rt_vision = vo_T_body * math_helpers.SE2Pose(og_feet.foot_state[1].foot_position_rt_body.x, og_feet.foot_state[1].foot_position_rt_body.y, 0)
+        pos_hl_rt_vision = vo_T_body * math_helpers.SE2Pose(og_feet.foot_state[2].foot_position_rt_body.x, og_feet.foot_state[2].foot_position_rt_body.y, 0)
+        pos_hr_rt_vision = vo_T_body * math_helpers.SE2Pose(og_feet.foot_state[3].foot_position_rt_body.x, og_feet.foot_state[3].foot_position_rt_body.y, 0)
 
-        # pos_fl_rt_vision = vo_T_body * math_helpers.SE2Pose(-x_offset, -y_offset, 0)
-        # pos_fr_rt_vision = vo_T_body * math_helpers.SE2Pose(-x_offset, y_offset, 0)
-        # pos_hl_rt_vision = vo_T_body * math_helpers.SE2Pose(x_offset, -y_offset, 0)
-        # pos_hr_rt_vision = vo_T_body * math_helpers.SE2Pose(x_offset, y_offset, 0)
+        test_cmd = RobotCommandBuilder.stance_command(
+            frame_helpers.VISION_FRAME_NAME, pos_fl_rt_vision.position, pos_fr_rt_vision.position,
+            pos_hl_rt_vision.position, pos_hr_rt_vision.position)
 
-        # stance_cmd = RobotCommandBuilder.stance_command(
-        #     frame_helpers.VISION_FRAME_NAME, pos_fl_rt_vision.position, pos_fr_rt_vision.position,
-        #     pos_hl_rt_vision.position, pos_hr_rt_vision.position)
+        test_cmd.synchronized_command.mobility_command.stance_request.end_time.CopyFrom(
+            self.robot.time_sync.robot_timestamp_from_local_secs(time.time() + 10))
 
+        blocking_command(self._command_client, test_cmd, check_stance_status)
 
-
-        # stance_cmd.synchronized_command.mobility_command.stance_request.end_time.CopyFrom(
-        #     self.robot.time_sync.robot_timestamp_from_local_secs(time.time() + 5))
-
-        # # Send the command
-        # # send = self._command_client.robot_command(stance_cmd)
-        # # time.sleep(4)
-        # # test = self._command_client.robot_command_feedback(send)
-        # # print(test)
-
-        # blocking_command(self._command_client, stance_cmd, check_stance_status)
+    def takeoff_qc_prepare(self):
+        self.zupvt_init()
+        self.prepare_spot()
+        self.x500_undocking()
+        self.revert_pose()
 
     def landing_qc_prepare(self):
-        x500_docking()
+        self.prepare_spot()
+        self.x500_docking()
+        self.revert_pose()
 
     def x500_undocking(self):
         #Unregister x500_docked
@@ -356,13 +343,66 @@ class SpotBodyPublisher:
         rospy.loginfo(f"THIS DOES FN DOES NOT SEND A MAGNETIZATION COMMAND")
     
     def stand_test(self):
-        blocking_stand(self._command_client, timeout_sec=10)
+        #blocking_stand(self._command_client, timeout_sec=10)
+        robot_command.blocking_stand(self._command_client)
+
+        self.nominal_pose = self._state_client.get_robot_state()
+        rospy.loginfo(f"foot x: {self.nominal_pose.foot_state}")
+        #rospy.loginfo(f"foot y: {self.nominal_pose.foot_state.foot_position_rt_body.y}")
+
+    def move_spot(self, dx, dy, dyaw, frame_name=ODOM_FRAME_NAME, stairs=False):
+        transforms = self._state_client.get_robot_state().kinematic_state.transforms_snapshot
+        # Build the transform for where we want the robot to be relative to where the body currently is.
+        body_tform_goal = math_helpers.SE2Pose(x=dx, y=dy, angle=dyaw)
+        # We do not want to command this goal in body frame because the body will move, thus shifting
+        # our goal. Instead, we transform this offset to get the goal position in the output frame
+        # (which will be either odom or vision).
+        out_tform_body = get_se2_a_tform_b(transforms, frame_name, BODY_FRAME_NAME)
+        out_tform_goal = out_tform_body * body_tform_goal
+
+        # Command the robot to go to the goal point in the specified frame. The command will stop at the
+        # new position.
+        robot_cmd = RobotCommandBuilder.synchro_se2_trajectory_point_command(
+            goal_x=out_tform_goal.x, goal_y=out_tform_goal.y, goal_heading=out_tform_goal.angle,
+            frame_name=frame_name, params=RobotCommandBuilder.mobility_params(stair_hint=stairs))
+        end_time = 10.0
+        cmd_id = self._command_client.robot_command(lease=None, command=robot_cmd,
+                                                    end_time_secs=time.time() + end_time)
+
+
+        status = robot_command.block_for_trajectory_cmd(self._command_client, cmd_id)
+        print(status)
+
+        # # Wait until the robot has reached the goal.
+        # while True:
+        #     feedback = robot_command_client.robot_command_feedback(cmd_id)
+        #     mobility_feedback = feedback.feedback.synchronized_feedback.mobility_command_feedback
+        #     if mobility_feedback.status != RobotCommandFeedbackStatus.STATUS_PROCESSING:
+        #         print('Failed to reach the goal')
+        #         return False
+        #     traj_feedback = mobility_feedback.se2_trajectory_feedback
+        #     if (traj_feedback.status == traj_feedback.STATUS_AT_GOAL and
+        #             traj_feedback.body_movement_status == traj_feedback.BODY_STATUS_SETTLED):
+        #         print('Arrived at the goal.')
+        #         return True
+        #     time.sleep(1)
+
+    def mock_autowalk(self):
+        #bosdyn.client.robot_command.block_for_trajectory_cmd
+        #bosdyn.client.robot_command.blocking_command
+        pass
 
 
 if __name__ == '__main__':
     node = SpotBodyPublisher()
-    # node.stand()
-    #node.takeoff_qc_prepare
+    #node.stand_test()
+    node.stand()
+    node.move_spot(0.5, 0.0, 0.0)
+    node.move_spot(1.0, 0.0, 0.0)
+    node.move_spot(1.0, -1.0, 90)
+    node.move_spot(1.0, 0.0, -90)
+    # node.takeoff_qc_prepare()
+    # node.landing_qc_prepare()
     #node.reset_pose()
     #node.stand()
     # node.release_lease()

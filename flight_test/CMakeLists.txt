@@ -13,6 +13,7 @@ find_package(catkin REQUIRED COMPONENTS
   std_msgs
   actionlib_msgs
   geometry_msgs
+  message_generation
   #mav_planning_msgs
   #mav_trajectory_generation
   #mav_trajectory_generation_ros
@@ -59,11 +60,10 @@ catkin_python_setup()
 # )
 
 ## Generate services in the 'srv' folder
-# add_service_files(
-#   FILES
-#   Service1.srv
-#   Service2.srv
-# )
+add_service_files(
+  FILES
+  mission.srv
+)
 
 ## Generate actions in the 'action' folder
 #add_action_files(
@@ -73,13 +73,13 @@ catkin_python_setup()
   #)
 
 ## Generate added messages and services with any dependencies listed here
-#generate_messages(
-#DEPENDENCIES
+generate_messages(
+  DEPENDENCIES
   #actionlib_msgs
-  #std_msgs
-  #geometry_msgs
+  std_msgs
+  geometry_msgs
   #mav_planning_msgs
-  #)
+  )
 
 ################################################
 ## Declare ROS dynamic reconfigure parameters ##
@@ -113,7 +113,7 @@ catkin_python_setup()
 catkin_package(
 #  INCLUDE_DIRS include
 #  LIBRARIES flight_test
- CATKIN_DEPENDS rospy std_msgs actionlib_msgs roscpp 
+ CATKIN_DEPENDS rospy std_msgs actionlib_msgs roscpp message_runtime 
  #mav_trajectory_generation
  #mav_trajectory_generation_ros
 #  DEPENDS system_lib
@@ -123,7 +123,7 @@ catkin_package(
 ## Build ##
 ###########
 
-## Specify additional locations of header files
+## message_generationSpecify additional locations of header files
 ## Your package locations should be listed before other locations
 include_directories(
 include
