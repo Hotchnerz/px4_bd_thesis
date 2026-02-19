@@ -30,6 +30,8 @@ import math
 import rospy
 from geometry_msgs.msg import TransformStamped, PoseStamped
 
+from flight_test.srv import mission, missionRequest
+
 import numpy as np
 
 
@@ -77,7 +79,12 @@ class SpotBodyPublisher:
         self.deployed_guid, self.deployed_secret = bosdyn.client.util.read_payload_credentials("../../payload_creds/x500_undocked")
         self.docked_guid, self.docked_secret = bosdyn.client.util.read_payload_credentials("../../payload_creds/x500_docked")
 
+        #Setup Publishers
         self.publisher = rospy.Publisher('/spot_pose', PoseStamped, queue_size=10)
+
+        #Ensure ROS Clients
+        rospy.wait_for_service('/mission_service')
+        self.qc_service = rospy.ServiceProxy('/mission_service', mission)
 
         #self.timer = self.create_timer(0.1, self.timer_callback)
         self.rate = rospy.Rate(10)
@@ -315,13 +322,26 @@ class SpotBodyPublisher:
     def takeoff_qc_prepare(self):
         self.zupvt_init()
         self.prepare_spot()
-        self.x500_undocking()
-        self.revert_pose()
+        takeoff_request = missionRequest()
+
+        takeoff_request.stateRequest = 'BREAKAWAY'
+
+        result = self.qc_service(takeoff_request)
+
+        if result:
+            #self.x500_undocking()
+            self.revert_pose()
 
     def landing_qc_prepare(self):
         self.prepare_spot()
-        self.x500_docking()
-        self.revert_pose()
+        takeoff_request = missionRequest()
+        takeoff_request.stateRequest = 'TOUCHDOWN'
+
+        result = self.qc_service(takeoff_request)
+
+        if result:
+            #self.x500_docking()
+            self.revert_pose()
 
     def x500_undocking(self):
         #Unregister x500_docked
@@ -397,12 +417,13 @@ if __name__ == '__main__':
     node = SpotBodyPublisher()
     #node.stand_test()
     node.stand()
-    node.move_spot(0.5, 0.0, 0.0)
-    node.move_spot(1.0, 0.0, 0.0)
-    node.move_spot(1.0, -1.0, 90)
-    node.move_spot(1.0, 0.0, -90)
-    # node.takeoff_qc_prepare()
-    # node.landing_qc_prepare()
+    node.takeoff_qc_prepare()
+    node.move_spot(1.5, 0.0, 0.0)
+    node.move_spot(-1.5, 0.0, 0.0)
+    # node.move_spot(1.0, -1.0, 90)
+    # node.move_spot(1.0, 0.0, -90)
+
+    node.landing_qc_prepare()
     #node.reset_pose()
     #node.stand()
     # node.release_lease()
