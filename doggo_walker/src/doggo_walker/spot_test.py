@@ -26,6 +26,10 @@ from bosdyn.client.frame_helpers import (BODY_FRAME_NAME, ODOM_FRAME_NAME, VISIO
 from bosdyn.client.payload import PayloadClient
 from bosdyn.client.payload_registration import PayloadRegistrationClient
 
+from bosdyn.api.graph_nav import graph_nav_pb2, map_pb2, nav_pb2
+from bosdyn.client.graph_nav import GraphNavClient
+import graph_nav_utils
+
 import math
 import rospy
 from geometry_msgs.msg import TransformStamped, PoseStamped
@@ -38,26 +42,36 @@ import numpy as np
 
 
 # map_tf_odom = SE3Pose(0, 1, 0, Quat(w=0.5735764, x=0, y=0, z=-0.819152))
-map_tf_body = SE3Pose(0, 1, 0, Quat(w=1.0, x=0, y=0, z=0))
+# map_tf_body = SE3Pose(0, 1, 0, Quat(w=1.0, x=0, y=0, z=0))
 
 
 class SpotBodyPublisher:
 
     def __init__(self):
-        rospy.init_node('SpotBodyPublisher', anonymous=False)
+        rospy.init_node('SpotCommander', anonymous=False)
 
         self.hostname = "192.168.1.76"
         self.bd_user = "admin"
         self.bd_pass = "4aud2u39hgfd"
 
-        self.sdk = bosdyn.client.create_standard_sdk("findSpot_melodic")
+        self.sdk = bosdyn.client.create_standard_sdk("spotCmdMission_melodic")
         self.robot = self.sdk.create_robot(self.hostname)
         self._lease_client = None
         self._command_client = None
         self._state_client = None
         self._lease = None
         self._lease_keepalive = None
-        self._payload_registration_client = self.robot.ensure_client(PayloadRegistrationClient.default_service_name)
+        self._payload_registration_client = None
+        self._graph_nav_client = None
+
+        self._upload_filepath = "../../x500_mock_inspectiom.walk"
+
+        # Store the most recent knowledge of the state of the robot based on rpc calls.
+        self._current_graph = None
+        self._current_edges = dict()  #maps to_waypoint to list(from_waypoint)
+        self._current_waypoint_snapshots = dict()  # maps id to waypoint snapshot
+        self._current_edge_snapshots = dict()  # maps id to edge snapshot
+        self._current_annotation_name_to_wp_id = dict()
 
         # Initialize the transform broadcaster
         # self.tf_broadcaster = TransformBroadcaster(self)
@@ -68,27 +82,27 @@ class SpotBodyPublisher:
         self.get_lease()
         self.nominal_pose = None
 
-        message = self._state_client.get_robot_state()
-        snapshot = message.kinematic_state.transforms_snapshot
+        # message = self._state_client.get_robot_state()
+        # snapshot = message.kinematic_state.transforms_snapshot
 
-        odom_tf_body_start = get_a_tform_b(snapshot, "odom", "body")
+        # odom_tf_body_start = get_a_tform_b(snapshot, "odom", "body")
 
-        self.map_tf_odom = map_tf_body * odom_tf_body_start.inverse()
+        # self.map_tf_odom = map_tf_body * odom_tf_body_start.inverse()
 
         #Get and store payload creds
         self.deployed_guid, self.deployed_secret = bosdyn.client.util.read_payload_credentials("../../payload_creds/x500_undocked")
         self.docked_guid, self.docked_secret = bosdyn.client.util.read_payload_credentials("../../payload_creds/x500_docked")
 
         #Setup Publishers
-        self.publisher = rospy.Publisher('/spot_pose', PoseStamped, queue_size=10)
+        # self.publisher = rospy.Publisher('/spot_pose', PoseStamped, queue_size=10)
 
         #Ensure ROS Clients
-        rospy.wait_for_service('/mission_service')
+        #rospy.wait_for_service('/mission_service')
         self.qc_service = rospy.ServiceProxy('/mission_service', mission)
 
         #self.timer = self.create_timer(0.1, self.timer_callback)
-        self.rate = rospy.Rate(10)
-        self.timer = rospy.Timer(rospy.Duration(0.1), self.timer_callback)
+        # self.rate = rospy.Rate(10)
+        # self.timer = rospy.Timer(rospy.Duration(0.1), self.timer_callback)
 
     def get_creds(self):
         return self.bd_user, self.bd_pass
@@ -109,35 +123,37 @@ class SpotBodyPublisher:
     def establish_clients(self):
         self._lease_client = self.robot.ensure_client(bosdyn.client.lease.LeaseClient.default_service_name)
         self._command_client = self.robot.ensure_client(bosdyn.client.robot_command.RobotCommandClient.default_service_name)
-    
+        self._payload_registration_client = self.robot.ensure_client(PayloadRegistrationClient.default_service_name)
+        self._graph_nav_client = self.robot.ensure_client(GraphNavClient.default_service_name)
+
     def get_lease(self):
         rospy.loginfo(f"THIS LEASE BELONGS TO {self.hostname} NOW!")
         self._lease = self._lease_client.take()
         self._lease_keepalive = bosdyn.client.lease.LeaseKeepAlive(self._lease_client, return_at_exit=True)
 
 
-    def timer_callback(self, event):
-        # Make a robot state request
-        #while not rospy.is_shutdown():
-        message = self._state_client.get_robot_state()
-        snapshot = message.kinematic_state.transforms_snapshot
+    # def timer_callback(self, event):
+    #     # Make a robot state request
+    #     #while not rospy.is_shutdown():
+    #     message = self._state_client.get_robot_state()
+    #     snapshot = message.kinematic_state.transforms_snapshot
 
-        odom_tf_body = get_a_tform_b(snapshot, "odom", "body")
-        map_tf_body = self.map_tf_odom * odom_tf_body
+    #     odom_tf_body = get_a_tform_b(snapshot, "odom", "body")
+    #     map_tf_body = self.map_tf_odom * odom_tf_body
 
-        # t = TransformStamped()
-        msg = PoseStamped()
-        msg.header.stamp = rospy.Time.now()
-        msg.header.frame_id = "spot_body"
+    #     # t = TransformStamped()
+    #     msg = PoseStamped()
+    #     msg.header.stamp = rospy.Time.now()
+    #     msg.header.frame_id = "spot_body"
 
-        msg.pose.position.x = map_tf_body.position.x
-        msg.pose.position.y = map_tf_body.position.y
-        msg.pose.position.z = map_tf_body.position.z
+    #     msg.pose.position.x = map_tf_body.position.x
+    #     msg.pose.position.y = map_tf_body.position.y
+    #     msg.pose.position.z = map_tf_body.position.z
 
-        msg.pose.orientation.x = map_tf_body.rotation.x
-        msg.pose.orientation.y = map_tf_body.rotation.y
-        msg.pose.orientation.z = map_tf_body.rotation.z
-        msg.pose.orientation.w = map_tf_body.rotation.w
+    #     msg.pose.orientation.x = map_tf_body.rotation.x
+    #     msg.pose.orientation.y = map_tf_body.rotation.y
+    #     msg.pose.orientation.z = map_tf_body.rotation.z
+    #     msg.pose.orientation.w = map_tf_body.rotation.w
 
     
     def prepare_spot(self):
@@ -254,10 +270,15 @@ class SpotBodyPublisher:
 
         # Specify a trajectory to shift the body forward followed by looking down, then return to nominal.
         # Define times (in seconds) for each point in the trajectory.
-        t1 = 0.375
-        t2 = 0.75
-        t3 = 1.125
-        t4 = 1.5
+        # t1 = 0.375
+        # t2 = 0.75
+        # t3 = 1.125
+        # t4 = 1.5
+    
+        t1 = 0.5
+        t2 = 1.0
+        t3 = 1.5
+        t4 = 2.0
 
         # Specify the poses as transformations to the cached flat_body pose.
         flat_body_T_pose1 = math_helpers.SE3Pose(x=0, y=0, z=-0.5, rot=math_helpers.Quat())
@@ -324,7 +345,7 @@ class SpotBodyPublisher:
         self.prepare_spot()
         takeoff_request = missionRequest()
 
-        takeoff_request.stateRequest = 'BREAKAWAY'
+        #takeoff_request.stateRequest = 'BREAKAWAY'
 
         result = self.qc_service(takeoff_request)
 
@@ -407,23 +428,288 @@ class SpotBodyPublisher:
         #         return True
         #     time.sleep(1)
 
+
+    def localize_to_map(self):
+        """Trigger localization when near a fiducial."""
+        robot_state = self._state_client.get_robot_state()
+
+        snapshot = robot_state.kinematic_state.transforms_snapshot
+
+        current_odom_tform_body = get_a_tform_b(snapshot, "odom", "body")
+
+        current_odom_tform_body = current_odom_tform_body.to_proto()
+
+        # current_odom_tform_body = get_odom_tform_body(
+        #     robot_state.kinematic_state.transforms_snapshot).to_proto()
+        # Create an empty instance for initial localization since we are asking it to localize
+        # based on the nearest fiducial.
+        localization = nav_pb2.Localization()
+        self._graph_nav_client.set_localization(initial_guess_localization=localization,
+                                                ko_tform_body=current_odom_tform_body)
+        
+        localization_state = self._graph_nav_client.get_localization_state()
+        print(localization_state.localization.waypoint_id)
+
+    def test_localization(self):
+        localization_state = self._graph_nav_client.get_localization_state()
+        print(localization_state.localization.waypoint_id)
+
+    def upload_map(self):
+        """Upload the graph and snapshots to the robot."""
+        print('Loading the graph from disk into local storage...')
+        with open(self._upload_filepath + '/graph', 'rb') as graph_file:
+            # Load the graph from disk.
+            data = graph_file.read()
+            self._current_graph = map_pb2.Graph()
+            self._current_graph.ParseFromString(data)
+            print(
+                f'Loaded graph has {len(self._current_graph.waypoints)} waypoints and {len(self._current_graph.edges)} edges'
+            )
+        for waypoint in self._current_graph.waypoints:
+            # Load the waypoint snapshots from disk.
+            with open(f'{self._upload_filepath}/waypoint_snapshots/{waypoint.snapshot_id}',
+                      'rb') as snapshot_file:
+                waypoint_snapshot = map_pb2.WaypointSnapshot()
+                waypoint_snapshot.ParseFromString(snapshot_file.read())
+                self._current_waypoint_snapshots[waypoint_snapshot.id] = waypoint_snapshot
+        for edge in self._current_graph.edges:
+            if len(edge.snapshot_id) == 0:
+                continue
+            # Load the edge snapshots from disk.
+            with open(f'{self._upload_filepath}/edge_snapshots/{edge.snapshot_id}',
+                      'rb') as snapshot_file:
+                edge_snapshot = map_pb2.EdgeSnapshot()
+                edge_snapshot.ParseFromString(snapshot_file.read())
+                self._current_edge_snapshots[edge_snapshot.id] = edge_snapshot
+        # Upload the graph to the robot.
+        print('Uploading the graph and snapshots to the robot...')
+        time_before = time.time()
+        true_if_empty = not len(self._current_graph.anchoring.anchors)
+        response = self._graph_nav_client.upload_graph(graph=self._current_graph,
+                                                       generate_new_anchoring=true_if_empty)
+        # Upload any missing snapshots to the robot.
+        upload_individually = False
+        try:
+            self._graph_nav_client.upload_snapshots(
+                graph_nav_pb2.UploadSnapshotsRequest.Snapshots(waypoint_snapshots=[],
+                                                               edge_snapshots=[]))
+        except:
+            # An empty UploadSnapshots request failed, fall back to slow RPC.
+            upload_individually = True
+
+        if upload_individually:
+            for snapshot_id in response.unknown_waypoint_snapshot_ids:
+                waypoint_snapshot = self._current_waypoint_snapshots[snapshot_id]
+                self._graph_nav_client.upload_waypoint_snapshot(waypoint_snapshot)
+                print(f'Uploaded {waypoint_snapshot.id}')
+            for snapshot_id in response.unknown_edge_snapshot_ids:
+                edge_snapshot = self._current_edge_snapshots[snapshot_id]
+                self._graph_nav_client.upload_edge_snapshot(edge_snapshot)
+                print(f'Uploaded {edge_snapshot.id}')
+        else:
+            # Upload in groups of 16MB.
+            kMaxBytes = 16 * 1024 * 1024
+            snapshots = []
+            num_bytes = 0
+
+            # Upload waypoint snapshots.
+            for snapshot_id in response.unknown_waypoint_snapshot_ids:
+                this_bytes = self._current_waypoint_snapshots[snapshot_id].ByteSize()
+                if len(snapshots) > 0 and this_bytes + num_bytes > kMaxBytes:
+                    print(f'Uploading {len(snapshots)} waypoint snapshots')
+                    self._graph_nav_client.upload_snapshots(
+                        graph_nav_pb2.UploadSnapshotsRequest.Snapshots(
+                            waypoint_snapshots=snapshots, edge_snapshots=[]))
+                    snapshots = []
+                    num_bytes = 0
+                snapshots.append(self._current_waypoint_snapshots[snapshot_id])
+                num_bytes += this_bytes
+            if len(snapshots) > 0:
+                print(f'Uploading final {len(snapshots)} waypoint snapshots')
+                self._graph_nav_client.upload_snapshots(
+                    graph_nav_pb2.UploadSnapshotsRequest.Snapshots(waypoint_snapshots=snapshots,
+                                                                   edge_snapshots=[]))
+
+            # Upload edge snapshots.
+            snapshots = []
+            num_bytes = 0
+            for snapshot_id in response.unknown_edge_snapshot_ids:
+                this_bytes = self._current_edge_snapshots[snapshot_id].ByteSize()
+                if len(snapshots) > 0 and this_bytes + num_bytes > kMaxBytes:
+                    print(f'Uploading {len(snapshots)} edge snapshots')
+                    self._graph_nav_client.upload_snapshots(
+                        graph_nav_pb2.UploadSnapshotsRequest.Snapshots(
+                            waypoint_snapshots=[], edge_snapshots=snapshots))
+                    snapshots = []
+                    num_bytes = 0
+                snapshots.append(self._current_edge_snapshots[snapshot_id])
+                num_bytes += this_bytes
+            if len(snapshots) > 0:
+                print(f'Uploading final {len(snapshots)} edge snapshots')
+                self._graph_nav_client.upload_snapshots(
+                    graph_nav_pb2.UploadSnapshotsRequest.Snapshots(waypoint_snapshots=[],
+                                                                   edge_snapshots=snapshots))
+        upload_time = time.time() - time_before
+        print(
+            f'Uploaded graph and {len(response.unknown_waypoint_snapshot_ids)} (of {len(self._current_graph.waypoints)}) waypoints and {len(response.unknown_edge_snapshot_ids)} (of {len(self._current_graph.edges)}) edges, elapsed time {round(upload_time * 1000)}ms'
+        )
+
+        #CHECK TO MAKE SURE MAP IS FOUND!!
+        localization_state = self._graph_nav_client.get_localization_state()
+
+    def clear_graphs(self):
+        """Clear the state of the map on the robot, removing all waypoints and
+        edges."""
+        return self._graph_nav_client.clear_graph()
+
+    def nav_to_waypoint(self, waypoint):
+        """Navigate to a specific waypoint."""
+
+        destination_waypoint = graph_nav_utils.find_unique_waypoint_id(
+            waypoint, self._current_graph, self._current_annotation_name_to_wp_id)
+        if not destination_waypoint:
+            # Failed to find the appropriate unique waypoint id for the navigation command.
+            return
+        # if not self.toggle_power(should_power_on=True):
+        #     print('Failed to power on the robot, and cannot complete navigate to request.')
+        #     return
+
+        nav_to_cmd_id = None
+        # Navigate to the destination waypoint.
+        is_finished = False
+        while not is_finished:
+            # Issue the navigation command about twice a second such that it is easy to terminate the
+            # navigation command (with estop or killing the program).
+            try:
+                nav_to_cmd_id = self._graph_nav_client.navigate_to(destination_waypoint, 1.0,
+                                                                   command_id=nav_to_cmd_id)
+            except ResponseError as e:
+                print(f'Error while navigating {e}')
+                break
+            time.sleep(.5)  # Sleep for half a second to allow for command execution.
+            # Poll the robot for feedback to determine if the navigation command is complete. Then sit
+            # the robot down once it is finished.
+            is_finished = self._check_success(nav_to_cmd_id)
+
+        # # Power off the robot if appropriate.
+        # if self._powered_on and not self._started_powered_on:
+        #     # Sit the robot down + power off after the navigation command is complete.
+        #     self.toggle_power(should_power_on=False)
+    
+    def nav_route(self, route):
+        """Navigate through a specific route of waypoints."""
+        waypoint_ids = route
+        for i in range(len(waypoint_ids)):
+            waypoint_ids[i] = graph_nav_utils.find_unique_waypoint_id(
+                waypoint_ids[i], self._current_graph, self._current_annotation_name_to_wp_id)
+            if not waypoint_ids[i]:
+                # Failed to find the unique waypoint id.
+                return
+
+        edge_ids_list = []
+        all_edges_found = True
+        # Attempt to find edges in the current graph that match the ordered waypoint pairs.
+        # These are necessary to create a valid route.
+        for i in range(len(waypoint_ids) - 1):
+            start_wp = waypoint_ids[i]
+            end_wp = waypoint_ids[i + 1]
+            edge_id = self._match_edge(self._current_edges, start_wp, end_wp)
+            if edge_id is not None:
+                edge_ids_list.append(edge_id)
+            else:
+                all_edges_found = False
+                print(f'Failed to find an edge between waypoints: {start_wp} and {end_wp}')
+                print(
+                    'List the graph\'s waypoints and edges to ensure pairs of waypoints has an edge.'
+                )
+                break
+
+        if all_edges_found:
+            if not self.toggle_power(should_power_on=True):
+                print('Failed to power on the robot, and cannot complete navigate route request.')
+                return
+
+            # Navigate a specific route.
+            route = self._graph_nav_client.build_route(waypoint_ids, edge_ids_list)
+            is_finished = False
+            while not is_finished:
+                # Issue the route command about twice a second such that it is easy to terminate the
+                # navigation command (with estop or killing the program).
+                nav_route_command_id = self._graph_nav_client.navigate_route(
+                    route, cmd_duration=1.0)
+                time.sleep(.5)  # Sleep for half a second to allow for command execution.
+                # Poll the robot for feedback to determine if the route is complete. Then sit
+                # the robot down once it is finished.
+                is_finished = self._check_success(nav_route_command_id)
+
+            # Power off the robot if appropriate.
+            if self._powered_on and not self._started_powered_on:
+                # Sit the robot down + power off after the navigation command is complete.
+                self.toggle_power(should_power_on=False)
+
+    def list_graphs(self):
+        """List the waypoint ids and edge ids of the graph currently on the
+        robot."""
+
+        # Download current graph
+        graph = self._graph_nav_client.download_graph()
+        if graph is None:
+            print('Empty graph.')
+            return
+        self._current_graph = graph
+
+        localization_id = self._graph_nav_client.get_localization_state().localization.waypoint_id
+
+        # Update and print waypoints and edges
+        self._current_annotation_name_to_wp_id, self._current_edges = graph_nav_utils.update_waypoints_and_edges(
+            graph, localization_id)
+
+    def _check_success(self, command_id=-1):
+        """Use a navigation command id to get feedback from the robot and sit
+        when command succeeds."""
+        if command_id == -1:
+            # No command, so we have no status to check.
+            return False
+        status = self._graph_nav_client.navigation_feedback(command_id)
+        if status.status == graph_nav_pb2.NavigationFeedbackResponse.STATUS_REACHED_GOAL:
+            # Successfully completed the navigation commands!
+            return True
+        elif status.status == graph_nav_pb2.NavigationFeedbackResponse.STATUS_LOST:
+            print('Robot got lost when navigating the route, the robot will now sit down.')
+            return True
+        elif status.status == graph_nav_pb2.NavigationFeedbackResponse.STATUS_STUCK:
+            print('Robot got stuck when navigating the route, the robot will now sit down.')
+            return True
+        elif status.status == graph_nav_pb2.NavigationFeedbackResponse.STATUS_ROBOT_IMPAIRED:
+            print('Robot is impaired.')
+            return True
+        else:
+            # Navigation command is not complete yet.
+            return False
+
     def mock_autowalk(self):
         #bosdyn.client.robot_command.block_for_trajectory_cmd
         #bosdyn.client.robot_command.blocking_command
         pass
 
-
 if __name__ == '__main__':
     node = SpotBodyPublisher()
     #node.stand_test()
     node.stand()
-    node.takeoff_qc_prepare()
-    node.move_spot(1.5, 0.0, 0.0)
-    node.move_spot(-1.5, 0.0, 0.0)
-    # node.move_spot(1.0, -1.0, 90)
+    #node.zupvt_init()
+    #node.takeoff_qc_prepare()
+    # node.move_spot(1.0, 0.0, 0.0)
+    # node.move_spot(1.5, -1.0, -45.0)
+    # node.move_spot(-0.75, 0.9, 45)
+    # node.move_spot(0.0, 0.25, 90)
     # node.move_spot(1.0, 0.0, -90)
 
-    node.landing_qc_prepare()
+    # node.landing_qc_prepare()
     #node.reset_pose()
     #node.stand()
     # node.release_lease()
+    #node.upload_map()
+    #node.localize_to_map()
+    #node.clear_graphs()
+    # node.test_localization()
+    node.nav_to_waypoint("sneezy-gadfly-qSLBadUY.hL7LByNUKQaNQ==")
