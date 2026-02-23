@@ -30,7 +30,7 @@ def find_unique_waypoint_id(short_code, graph, name_to_id):
     """Convert either a 2 letter short code or an annotation name into the associated unique id."""
     if graph is None:
         print(
-            'Please list the waypoints in the map before trying to navigate to a specific one (Option #4).'
+            'No Graph Loaded...'
         )
         return
 
@@ -101,10 +101,13 @@ def update_waypoints_and_edges(graph, localization_id, do_print=True):
 
     # Print out the waypoints name, id, and short code in an ordered sorted by the timestamp from
     # when the waypoint was created.
+    ordered_ids = {}
+
     if do_print:
         print(f'{len(graph.waypoints):d} waypoints:')
         for waypoint in waypoint_to_timestamp:
             pretty_print_waypoints(waypoint[0], waypoint[2], short_code_to_count, localization_id)
+            ordered_ids[waypoint[2]] = waypoint[0]
 
     for edge in graph.edges:
         if edge.id.to_waypoint in edges:
@@ -116,7 +119,7 @@ def update_waypoints_and_edges(graph, localization_id, do_print=True):
             print(f'(Edge) from waypoint {edge.id.from_waypoint} to waypoint {edge.id.to_waypoint} '
                   f'(cost {edge.annotations.cost.value})')
 
-    return name_to_id, edges
+    return name_to_id, edges, ordered_ids
 
 
 def sort_waypoints_chrono(graph):

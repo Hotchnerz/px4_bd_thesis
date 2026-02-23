@@ -64,7 +64,7 @@ class SpotBodyPublisher:
         self._payload_registration_client = None
         self._graph_nav_client = None
 
-        self._upload_filepath = "../../x500_mock_inspectiom.walk"
+        self._upload_filepath = "../../autowalks/x500_mock_inspectiom.walk"
 
         # Store the most recent knowledge of the state of the robot based on rpc calls.
         self._current_graph = None
@@ -72,6 +72,7 @@ class SpotBodyPublisher:
         self._current_waypoint_snapshots = dict()  # maps id to waypoint snapshot
         self._current_edge_snapshots = dict()  # maps id to edge snapshot
         self._current_annotation_name_to_wp_id = dict()
+        self._ordered_ids = dict()
 
         # Initialize the transform broadcaster
         # self.tf_broadcaster = TransformBroadcaster(self)
@@ -97,7 +98,7 @@ class SpotBodyPublisher:
         # self.publisher = rospy.Publisher('/spot_pose', PoseStamped, queue_size=10)
 
         #Ensure ROS Clients
-        #rospy.wait_for_service('/mission_service')
+        rospy.wait_for_service('/mission_service')
         self.qc_service = rospy.ServiceProxy('/mission_service', mission)
 
         #self.timer = self.create_timer(0.1, self.timer_callback)
@@ -345,12 +346,12 @@ class SpotBodyPublisher:
         self.prepare_spot()
         takeoff_request = missionRequest()
 
-        #takeoff_request.stateRequest = 'BREAKAWAY'
+        takeoff_request.stateRequest = 'BREAKAWAY'
 
         result = self.qc_service(takeoff_request)
 
         if result:
-            #self.x500_undocking()
+            self.x500_undocking()
             self.revert_pose()
 
     def landing_qc_prepare(self):
@@ -361,7 +362,7 @@ class SpotBodyPublisher:
         result = self.qc_service(takeoff_request)
 
         if result:
-            #self.x500_docking()
+            self.x500_docking()
             self.revert_pose()
 
     def x500_undocking(self):
@@ -625,9 +626,11 @@ class SpotBodyPublisher:
                 break
 
         if all_edges_found:
-            if not self.toggle_power(should_power_on=True):
-                print('Failed to power on the robot, and cannot complete navigate route request.')
-                return
+            
+            # if not self.toggle_power(should_power_on=True):
+            #     print('Failed to power on the robot, and cannot complete navigate route request.')
+                # print("WTF")
+                # return
 
             # Navigate a specific route.
             route = self._graph_nav_client.build_route(waypoint_ids, edge_ids_list)
@@ -643,9 +646,22 @@ class SpotBodyPublisher:
                 is_finished = self._check_success(nav_route_command_id)
 
             # Power off the robot if appropriate.
-            if self._powered_on and not self._started_powered_on:
-                # Sit the robot down + power off after the navigation command is complete.
-                self.toggle_power(should_power_on=False)
+            # if self._powered_on and not self._started_powered_on:
+            #     # Sit the robot down + power off after the navigation command is complete.
+            #     self.toggle_power(should_power_on=False)
+
+    def _match_edge(self, current_edges, waypoint1, waypoint2):
+        """Find an edge in the graph that is between two waypoint ids."""
+        # Return the correct edge id as soon as it's found.
+        for edge_to_id in current_edges:
+            for edge_from_id in current_edges[edge_to_id]:
+                if (waypoint1 == edge_to_id) and (waypoint2 == edge_from_id):
+                    # This edge matches the pair of waypoints! Add it the edge list and continue.
+                    return map_pb2.Edge.Id(from_waypoint=waypoint2, to_waypoint=waypoint1)
+                elif (waypoint2 == edge_to_id) and (waypoint1 == edge_from_id):
+                    # This edge matches the pair of waypoints! Add it the edge list and continue.
+                    return map_pb2.Edge.Id(from_waypoint=waypoint1, to_waypoint=waypoint2)
+        return None
 
     def list_graphs(self):
         """List the waypoint ids and edge ids of the graph currently on the
@@ -661,8 +677,10 @@ class SpotBodyPublisher:
         localization_id = self._graph_nav_client.get_localization_state().localization.waypoint_id
 
         # Update and print waypoints and edges
-        self._current_annotation_name_to_wp_id, self._current_edges = graph_nav_utils.update_waypoints_and_edges(
+        self._current_annotation_name_to_wp_id, self._current_edges, self._ordered_ids = graph_nav_utils.update_waypoints_and_edges(
             graph, localization_id)
+        target_waypoints = list(self._ordered_ids.values())
+        print(target_waypoints)
 
     def _check_success(self, command_id=-1):
         """Use a navigation command id to get feedback from the robot and sit
@@ -688,9 +706,34 @@ class SpotBodyPublisher:
             return False
 
     def mock_autowalk(self):
-        #bosdyn.client.robot_command.block_for_trajectory_cmd
-        #bosdyn.client.robot_command.blocking_command
-        pass
+        # Clear any graphs on the Spot robot
+        self.clear_graphs()
+
+        # Upload the graph and intialize
+        self.upload_map()
+        self.localize_to_map()
+        self.list_graphs()
+
+        #Check that it was localized. If localized:
+        #Go to Takeoff Point
+        target_waypoints = list(self._ordered_ids.values())
+        self.nav_route(target_waypoints[1:6])
+        self.takeoff_qc_prepare()
+        time.sleep(1.5)
+        #Go to Inspection Point 1
+        self.nav_route(target_waypoints[6:8])
+        time.sleep(1.5)
+        # Go to Inspection Point 2
+        self.nav_route(target_waypoints[8:13])
+        time.sleep(1.5)
+        # Go to Inspection Point 3
+        self.nav_route(target_waypoints[13:17])
+        time.sleep(1.5)
+        # Go to Rendezvous Point
+        self.nav_route(target_waypoints[17:22])
+        self.landing_qc_prepare()
+        time.sleep(1.5)
+
 
 if __name__ == '__main__':
     node = SpotBodyPublisher()
@@ -712,4 +755,5 @@ if __name__ == '__main__':
     #node.localize_to_map()
     #node.clear_graphs()
     # node.test_localization()
-    node.nav_to_waypoint("sneezy-gadfly-qSLBadUY.hL7LByNUKQaNQ==")
+    #node.nav_to_waypoint("sneezy-gadfly-qSLBadUY.hL7LByNUKQaNQ==")
+    node.mock_autowalk()
