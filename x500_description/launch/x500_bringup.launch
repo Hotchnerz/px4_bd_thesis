@@ -8,11 +8,23 @@
    <node pkg="tf2_ros" type="static_transform_publisher" name="global_to_map"
         args ="0.0 0.0 0.0 0.0 0.0 0.0 1.0  global map" />
 
-    <node pkg="tf2_ros" type="static_transform_publisher" name="realsense_to_baselink"
-        args ="0.135 0.0 -0.079 0.7071 -0.7071 0.0 0.0 base_link d455_link" />
+   <!-- <node pkg="tf2_ros" type="static_transform_publisher" name="realsense_to_baselink"
+	args ="0.135 0.0 -0.079 0.7071 -0.7071 0.0 0.0 base_link d455_link" /> -->
 
-    <node pkg="tf2_ros" type="static_transform_publisher" name="cam0_to_corrpose"
-        args ="0.0 0.0 0.0 -0.7071068 0.7071068 0.0 0.0 cam0 corr_pose" />
+   <node pkg="tf2_ros" type="static_transform_publisher" name="d455link_to_baselink"
+	args ="0.081 0.048 -0.067 0.0 0.0 0.0 1.0 base_link d455_link" />
+
+   <!-- <node pkg="tf2_ros" type="static_transform_publisher" name="cam0_to_corrpose"
+	  args ="0.0 0.0 0.0 -0.7071068 0.7071068 0.0 0.0 cam0 corr_pose" /> -->
+
+   <node pkg="tf2_ros" type="static_transform_publisher" name="cam0_to_corrpose"
+	args ="0.0 0.0 0.0 0.5 -0.5 0.5 0.5 cam0 corr_pose" />
+
+   <!-- <node pkg="tf2_ros" type="static_transform_publisher" name="cam0_to_corrpose"
+	args ="0.0 0.0 0.0 0.0 0.0 0.0 1.0 cam0 corr_pose" /> -->
+
+   <node pkg="tf2_ros" type="static_transform_publisher" name="rpicam_to_d455link"
+	args ="-0.011 -0.048 -0.032 -0.7071068 0.7071068 0.0 0.0 d455_link csi_cam_0_link" />
 
 </launch>
 

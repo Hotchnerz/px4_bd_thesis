@@ -26,8 +26,8 @@ import numpy as np
 
 
 # map_tf_odom = SE3Pose(0, 1, 0, Quat(w=0.5735764, x=0, y=0, z=-0.819152))
-map_tf_body = SE3Pose(0, 1, 0, Quat(w=1.0, x=0, y=0, z=0))
-
+#map_tf_body = SE3Pose(0, 1, 0, Quat(w=1.0, x=0, y=0, z=0))
+map_tf_body = SE3Pose(0.17835, 0, -0.32152, Quat(w=1.0, x=0, y=0, z=0))
 
 class SpotBodyPublisher:
 
@@ -42,9 +42,9 @@ class SpotBodyPublisher:
         self.bd_user = "admin"
         self.bd_pass = "4aud2u39hgfd"
 
-        # self.hostname = "192.168.1.76"
-        # self.bd_user = "cio"
-        # self.bd_pass = "ciociociocio"
+        #self.hostname = "192.168.1.76"
+        #self.bd_user = "cio"
+        #self.bd_pass = "ciociociocio"
 
         self.sdk = bosdyn.client.create_standard_sdk("findSpot_melodic")
         self.robot = self.sdk.create_robot(self.hostname)
