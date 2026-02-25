@@ -104,7 +104,7 @@ def update_waypoints_and_edges(graph, localization_id, do_print=True):
     ordered_ids = {}
 
     if do_print:
-        print(f'{len(graph.waypoints):d} waypoints:')
+        # print(f'{len(graph.waypoints):d} waypoints:')
         for waypoint in waypoint_to_timestamp:
             pretty_print_waypoints(waypoint[0], waypoint[2], short_code_to_count, localization_id)
             ordered_ids[waypoint[2]] = waypoint[0]
@@ -115,7 +115,7 @@ def update_waypoints_and_edges(graph, localization_id, do_print=True):
                 edges[edge.id.to_waypoint].append(edge.id.from_waypoint)
         else:
             edges[edge.id.to_waypoint] = [edge.id.from_waypoint]
-        if do_print:
+        if not do_print:
             print(f'(Edge) from waypoint {edge.id.from_waypoint} to waypoint {edge.id.to_waypoint} '
                   f'(cost {edge.annotations.cost.value})')
 

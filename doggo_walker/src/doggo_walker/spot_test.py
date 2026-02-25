@@ -1,9 +1,5 @@
 #!/usr/bin/env python3
-
 import time
-
-# from pathlib import Path
-# import dotenv
 
 import bosdyn.client
 import bosdyn.client.util
@@ -19,9 +15,6 @@ from bosdyn.api.spot import robot_command_pb2 as spot_command_pb2
 from bosdyn.api import basic_command_pb2
 from bosdyn.client.frame_helpers import (BODY_FRAME_NAME, ODOM_FRAME_NAME, VISION_FRAME_NAME,
                                          get_se2_a_tform_b)
-# import tf2_ros
-# from tf.transformations import quaternion_from_euler, quaternion_multiply
-# from tf2_ros import TransformBroadcaster
 
 from bosdyn.client.payload import PayloadClient
 from bosdyn.client.payload_registration import PayloadRegistrationClient
@@ -32,17 +25,11 @@ import graph_nav_utils
 
 import math
 import rospy
-from geometry_msgs.msg import TransformStamped, PoseStamped
+from geometry_msgs.msg import TransformStamped, PoseStamped, Pose, PoseArray
 
 from flight_test.srv import mission, missionRequest
 
 import numpy as np
-
-
-
-
-# map_tf_odom = SE3Pose(0, 1, 0, Quat(w=0.5735764, x=0, y=0, z=-0.819152))
-# map_tf_body = SE3Pose(0, 1, 0, Quat(w=1.0, x=0, y=0, z=0))
 
 
 class SpotBodyPublisher:
@@ -64,7 +51,8 @@ class SpotBodyPublisher:
         self._payload_registration_client = None
         self._graph_nav_client = None
 
-        self._upload_filepath = "../../autowalks/x500_mock_inspectiom.walk"
+        #self._upload_filepath = "../../autowalks/x500_mock_inspectiom.walk"
+        self._upload_filepath = "/home/radam/distrobox/bd_home/thesis_ws/src/doggo_walker/autowalks/simple_x500_inspection.walk"
 
         # Store the most recent knowledge of the state of the robot based on rpc calls.
         self._current_graph = None
@@ -74,8 +62,6 @@ class SpotBodyPublisher:
         self._current_annotation_name_to_wp_id = dict()
         self._ordered_ids = dict()
 
-        # Initialize the transform broadcaster
-        # self.tf_broadcaster = TransformBroadcaster(self)
 
         self.get_creds()
         self.connect()
@@ -83,27 +69,14 @@ class SpotBodyPublisher:
         self.get_lease()
         self.nominal_pose = None
 
-        # message = self._state_client.get_robot_state()
-        # snapshot = message.kinematic_state.transforms_snapshot
-
-        # odom_tf_body_start = get_a_tform_b(snapshot, "odom", "body")
-
-        # self.map_tf_odom = map_tf_body * odom_tf_body_start.inverse()
-
         #Get and store payload creds
-        self.deployed_guid, self.deployed_secret = bosdyn.client.util.read_payload_credentials("../../payload_creds/x500_undocked")
-        self.docked_guid, self.docked_secret = bosdyn.client.util.read_payload_credentials("../../payload_creds/x500_docked")
-
-        #Setup Publishers
-        # self.publisher = rospy.Publisher('/spot_pose', PoseStamped, queue_size=10)
+        self.deployed_guid, self.deployed_secret = bosdyn.client.util.read_payload_credentials("/home/radam/distrobox/bd_home/thesis_ws/src/doggo_walker/payload_creds/x500_undocked")
+        self.docked_guid, self.docked_secret = bosdyn.client.util.read_payload_credentials("/home/radam/distrobox/bd_home/thesis_ws/src/doggo_walker/payload_creds/x500_docked")
 
         #Ensure ROS Clients
-        rospy.wait_for_service('/mission_service')
+        #rospy.wait_for_service('/mission_service')
         self.qc_service = rospy.ServiceProxy('/mission_service', mission)
 
-        #self.timer = self.create_timer(0.1, self.timer_callback)
-        # self.rate = rospy.Rate(10)
-        # self.timer = rospy.Timer(rospy.Duration(0.1), self.timer_callback)
 
     def get_creds(self):
         return self.bd_user, self.bd_pass
@@ -132,41 +105,14 @@ class SpotBodyPublisher:
         self._lease = self._lease_client.take()
         self._lease_keepalive = bosdyn.client.lease.LeaseKeepAlive(self._lease_client, return_at_exit=True)
 
-
-    # def timer_callback(self, event):
-    #     # Make a robot state request
-    #     #while not rospy.is_shutdown():
-    #     message = self._state_client.get_robot_state()
-    #     snapshot = message.kinematic_state.transforms_snapshot
-
-    #     odom_tf_body = get_a_tform_b(snapshot, "odom", "body")
-    #     map_tf_body = self.map_tf_odom * odom_tf_body
-
-    #     # t = TransformStamped()
-    #     msg = PoseStamped()
-    #     msg.header.stamp = rospy.Time.now()
-    #     msg.header.frame_id = "spot_body"
-
-    #     msg.pose.position.x = map_tf_body.position.x
-    #     msg.pose.position.y = map_tf_body.position.y
-    #     msg.pose.position.z = map_tf_body.position.z
-
-    #     msg.pose.orientation.x = map_tf_body.rotation.x
-    #     msg.pose.orientation.y = map_tf_body.rotation.y
-    #     msg.pose.orientation.z = map_tf_body.rotation.z
-    #     msg.pose.orientation.w = map_tf_body.rotation.w
-
     
     def prepare_spot(self):
 
         def check_stance_status(cmd):
-            # cmd = basic_command_pb2.BatteryChangePoseCommand.Request.HINT_RIGHT
-            # cmd = robot_command_pb2.RobotCommandFe
             return cmd.feedback.synchronized_feedback.mobility_command_feedback.stance_feedback.status == basic_command_pb2.StanceCommand.Feedback.STATUS_STANCED
             
 
         # This example ues the current body position, but you can specify any position.
-        # A common use is to specify it relative to something you know, like a fiducial.
         self.nominal_pose = self._state_client.get_robot_state()
         vo_T_body = frame_helpers.get_se2_a_tform_b(self.nominal_pose.kinematic_state.transforms_snapshot,
                                                     frame_helpers.VISION_FRAME_NAME,
@@ -176,7 +122,6 @@ class SpotBodyPublisher:
         #Max Height = 0.502342052748 / -4.641268730163574
         #Min Height = 0.282637324592 / -4.437628746032715
         
-        #### Example stance offsets from body position. ####
         #Seems like 0.2 offsets is the normal offsets
         x_offset = 0.3
         y_offset = 0.3
@@ -192,12 +137,6 @@ class SpotBodyPublisher:
 
         stance_cmd.synchronized_command.mobility_command.stance_request.end_time.CopyFrom(
             self.robot.time_sync.robot_timestamp_from_local_secs(time.time() + 5))
-
-        # Send the command
-        # send = self._command_client.robot_command(stance_cmd)
-        # time.sleep(4)
-        # test = self._command_client.robot_command_feedback(send)
-        # print(test)
 
         blocking_command(self._command_client, stance_cmd, check_stance_status)
 
@@ -242,30 +181,7 @@ class SpotBodyPublisher:
         blocking_stand(self._command_client, timeout_sec=10)
 
     def zupvt_init(self):
-        #Might want to look at the blocking robot_commands in documentation
-        # height_cmd_1 = RobotCommandBuilder.synchro_stand_command(body_height= -0.5)
-
-        # height_cmd_2 = RobotCommandBuilder.synchro_stand_command(body_height= 0.5)
-
-        # height_cmd_3 = RobotCommandBuilder.synchro_stand_command(body_height=-0.6)
-
-        # height_cmd_4 = RobotCommandBuilder.synchro_stand_command(body_height=0.0)
-
-        # height_cmd.synchronized_command.mobility_command.stand_request.end_time.CopyFrom(
-        #     self.robot.time_sync.robot_timestamp_from_local_secs(time.time() + 5))
-        
-        # popping_up_down = RobotCommandBuilder.build_synchro_command(height_cmd_1, height_cmd_2, height_cmd_3, height_cmd_4)
-        # print(popping_up_down)
-        # self._command_client.robot_command(popping_up_down)
-
-        # height_cmd = RobotCommandBuilder.synchro_se2_trajectory_command()
-
-        # nom_height = RobotCommandBuilder.synchro_stand_command(body_height= 0.0)
-        # self._command_client.robot_command(nom_height)
-
-        
         robot_state = self._state_client.get_robot_state()
-
         odom_T_flat_body = get_a_tform_b(robot_state.kinematic_state.transforms_snapshot,
                                          frame_helpers.ODOM_FRAME_NAME, frame_helpers.GRAV_ALIGNED_BODY_FRAME_NAME)
 
@@ -440,16 +356,12 @@ class SpotBodyPublisher:
 
         current_odom_tform_body = current_odom_tform_body.to_proto()
 
-        # current_odom_tform_body = get_odom_tform_body(
-        #     robot_state.kinematic_state.transforms_snapshot).to_proto()
-        # Create an empty instance for initial localization since we are asking it to localize
-        # based on the nearest fiducial.
         localization = nav_pb2.Localization()
         self._graph_nav_client.set_localization(initial_guess_localization=localization,
                                                 ko_tform_body=current_odom_tform_body)
         
         localization_state = self._graph_nav_client.get_localization_state()
-        print(localization_state.localization.waypoint_id)
+        #print(localization_state.localization.waypoint_id)
 
     def test_localization(self):
         localization_state = self._graph_nav_client.get_localization_state()
@@ -457,13 +369,13 @@ class SpotBodyPublisher:
 
     def upload_map(self):
         """Upload the graph and snapshots to the robot."""
-        print('Loading the graph from disk into local storage...')
+        rospy.loginfo('Loading the graph from disk into local storage...')
         with open(self._upload_filepath + '/graph', 'rb') as graph_file:
             # Load the graph from disk.
             data = graph_file.read()
             self._current_graph = map_pb2.Graph()
             self._current_graph.ParseFromString(data)
-            print(
+            rospy.loginfo(
                 f'Loaded graph has {len(self._current_graph.waypoints)} waypoints and {len(self._current_graph.edges)} edges'
             )
         for waypoint in self._current_graph.waypoints:
@@ -483,7 +395,7 @@ class SpotBodyPublisher:
                 edge_snapshot.ParseFromString(snapshot_file.read())
                 self._current_edge_snapshots[edge_snapshot.id] = edge_snapshot
         # Upload the graph to the robot.
-        print('Uploading the graph and snapshots to the robot...')
+        rospy.loginfo('Uploading the graph and snapshots to the robot...')
         time_before = time.time()
         true_if_empty = not len(self._current_graph.anchoring.anchors)
         response = self._graph_nav_client.upload_graph(graph=self._current_graph,
@@ -502,11 +414,11 @@ class SpotBodyPublisher:
             for snapshot_id in response.unknown_waypoint_snapshot_ids:
                 waypoint_snapshot = self._current_waypoint_snapshots[snapshot_id]
                 self._graph_nav_client.upload_waypoint_snapshot(waypoint_snapshot)
-                print(f'Uploaded {waypoint_snapshot.id}')
+                rospy.loginfo(f'Uploaded {waypoint_snapshot.id}')
             for snapshot_id in response.unknown_edge_snapshot_ids:
                 edge_snapshot = self._current_edge_snapshots[snapshot_id]
                 self._graph_nav_client.upload_edge_snapshot(edge_snapshot)
-                print(f'Uploaded {edge_snapshot.id}')
+                rospy.loginfo(f'Uploaded {edge_snapshot.id}')
         else:
             # Upload in groups of 16MB.
             kMaxBytes = 16 * 1024 * 1024
@@ -517,7 +429,7 @@ class SpotBodyPublisher:
             for snapshot_id in response.unknown_waypoint_snapshot_ids:
                 this_bytes = self._current_waypoint_snapshots[snapshot_id].ByteSize()
                 if len(snapshots) > 0 and this_bytes + num_bytes > kMaxBytes:
-                    print(f'Uploading {len(snapshots)} waypoint snapshots')
+                    rospy.loginfo(f'Uploading {len(snapshots)} waypoint snapshots')
                     self._graph_nav_client.upload_snapshots(
                         graph_nav_pb2.UploadSnapshotsRequest.Snapshots(
                             waypoint_snapshots=snapshots, edge_snapshots=[]))
@@ -526,7 +438,7 @@ class SpotBodyPublisher:
                 snapshots.append(self._current_waypoint_snapshots[snapshot_id])
                 num_bytes += this_bytes
             if len(snapshots) > 0:
-                print(f'Uploading final {len(snapshots)} waypoint snapshots')
+                rospy.loginfo(f'Uploading final {len(snapshots)} waypoint snapshots')
                 self._graph_nav_client.upload_snapshots(
                     graph_nav_pb2.UploadSnapshotsRequest.Snapshots(waypoint_snapshots=snapshots,
                                                                    edge_snapshots=[]))
@@ -537,7 +449,7 @@ class SpotBodyPublisher:
             for snapshot_id in response.unknown_edge_snapshot_ids:
                 this_bytes = self._current_edge_snapshots[snapshot_id].ByteSize()
                 if len(snapshots) > 0 and this_bytes + num_bytes > kMaxBytes:
-                    print(f'Uploading {len(snapshots)} edge snapshots')
+                    rospy.loginfo(f'Uploading {len(snapshots)} edge snapshots')
                     self._graph_nav_client.upload_snapshots(
                         graph_nav_pb2.UploadSnapshotsRequest.Snapshots(
                             waypoint_snapshots=[], edge_snapshots=snapshots))
@@ -546,12 +458,12 @@ class SpotBodyPublisher:
                 snapshots.append(self._current_edge_snapshots[snapshot_id])
                 num_bytes += this_bytes
             if len(snapshots) > 0:
-                print(f'Uploading final {len(snapshots)} edge snapshots')
+                rospy.loginfo(f'Uploading final {len(snapshots)} edge snapshots')
                 self._graph_nav_client.upload_snapshots(
                     graph_nav_pb2.UploadSnapshotsRequest.Snapshots(waypoint_snapshots=[],
                                                                    edge_snapshots=snapshots))
         upload_time = time.time() - time_before
-        print(
+        rospy.loginfo(
             f'Uploaded graph and {len(response.unknown_waypoint_snapshot_ids)} (of {len(self._current_graph.waypoints)}) waypoints and {len(response.unknown_edge_snapshot_ids)} (of {len(self._current_graph.edges)}) edges, elapsed time {round(upload_time * 1000)}ms'
         )
 
@@ -645,11 +557,6 @@ class SpotBodyPublisher:
                 # the robot down once it is finished.
                 is_finished = self._check_success(nav_route_command_id)
 
-            # Power off the robot if appropriate.
-            # if self._powered_on and not self._started_powered_on:
-            #     # Sit the robot down + power off after the navigation command is complete.
-            #     self.toggle_power(should_power_on=False)
-
     def _match_edge(self, current_edges, waypoint1, waypoint2):
         """Find an edge in the graph that is between two waypoint ids."""
         # Return the correct edge id as soon as it's found.
@@ -680,7 +587,7 @@ class SpotBodyPublisher:
         self._current_annotation_name_to_wp_id, self._current_edges, self._ordered_ids = graph_nav_utils.update_waypoints_and_edges(
             graph, localization_id)
         target_waypoints = list(self._ordered_ids.values())
-        print(target_waypoints)
+        #print(target_waypoints)
 
     def _check_success(self, command_id=-1):
         """Use a navigation command id to get feedback from the robot and sit
@@ -705,11 +612,16 @@ class SpotBodyPublisher:
             # Navigation command is not complete yet.
             return False
 
+    def pose_spot(self):
+        pass
+
     def mock_autowalk(self):
         # Clear any graphs on the Spot robot
+        rospy.loginfo("Clearing Spot's current graph.")
         self.clear_graphs()
 
         # Upload the graph and intialize
+        rospy.loginfo("Uploading mission map to Spot and localizing...")
         self.upload_map()
         self.localize_to_map()
         self.list_graphs()
@@ -717,42 +629,81 @@ class SpotBodyPublisher:
         #Check that it was localized. If localized:
         #Go to Takeoff Point
         target_waypoints = list(self._ordered_ids.values())
-        self.nav_route(target_waypoints[1:6])
+        #print(target_waypoints)
+        ###x500_Autowalk_Inspection###
+
+        # self.nav_route(target_waypoints[1:6])
+        # self.takeoff_qc_prepare()
+        # time.sleep(1.5)
+        # #Go to Inspection Point 1
+        # self.nav_route(target_waypoints[6:8])
+        # time.sleep(1.5)
+        # # Go to Inspection Point 2
+        # self.nav_route(target_waypoints[8:13])
+        # time.sleep(1.5)
+        # # Go to Inspection Point 3
+        # self.nav_route(target_waypoints[13:17])
+        # time.sleep(1.5)
+        # # Go to Rendezvous Point
+        # self.nav_route(target_waypoints[17:22])
+        # self.landing_qc_prepare()
+        # time.sleep(1.5)
+
+        ###simple_x500_inspection###
+        rospy.loginfo("Starting Mission...")
+        self.nav_route(target_waypoints[1:3])
+        
+        #Give sometime to start the hardware launch
+        ospy.loginfo("START THE HARDWARE.LAUNCH ROS LAUNCH FILE AND BAG FILE!")
+        time.sleep(18.0)
         self.takeoff_qc_prepare()
         time.sleep(1.5)
+        
         #Go to Inspection Point 1
-        self.nav_route(target_waypoints[6:8])
+        rospy.loginfo("Going to Inspection Point 1")
+        inspect_request = missionRequest()
+        mission_sps = PoseArray()
+        sp_1 = Pose()
+
+        sp_1.position.x = 1.5
+        sp_1.position.y = -1.35
+        sp_1.position.z = 1.5
+
+        sp_1.orientation.x = 0
+        sp_1.orientation.y = 0
+        sp_1.orientation.z = 0
+        sp_1.orientation.w = 1
+
+        mission_sps.poses.append(sp_1)
+
+        inspect_request.stateRequest = 'INSPECT'
+        inspect_request.setpoints = mission_sps
+        
+
+        result = self.qc_service(inspect_request)
+
+        if result:
+            self.nav_route(target_waypoints[3:6])
+        
         time.sleep(1.5)
+        
         # Go to Inspection Point 2
-        self.nav_route(target_waypoints[8:13])
-        time.sleep(1.5)
-        # Go to Inspection Point 3
-        self.nav_route(target_waypoints[13:17])
-        time.sleep(1.5)
-        # Go to Rendezvous Point
-        self.nav_route(target_waypoints[17:22])
+        self.nav_route(target_waypoints[6:13])
         self.landing_qc_prepare()
         time.sleep(1.5)
+
+        rospy.loginfo("Mission Completed. Releasing Leases...")
+        #Dont add this, it makes spot sit down after mission.
+        #self.release_lease()
 
 
 if __name__ == '__main__':
     node = SpotBodyPublisher()
-    #node.stand_test()
     node.stand()
-    #node.zupvt_init()
-    #node.takeoff_qc_prepare()
-    # node.move_spot(1.0, 0.0, 0.0)
-    # node.move_spot(1.5, -1.0, -45.0)
-    # node.move_spot(-0.75, 0.9, 45)
-    # node.move_spot(0.0, 0.25, 90)
-    # node.move_spot(1.0, 0.0, -90)
-
     # node.landing_qc_prepare()
     #node.reset_pose()
     #node.stand()
     # node.release_lease()
-    #node.upload_map()
-    #node.localize_to_map()
     #node.clear_graphs()
     # node.test_localization()
     #node.nav_to_waypoint("sneezy-gadfly-qSLBadUY.hL7LByNUKQaNQ==")
