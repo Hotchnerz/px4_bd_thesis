@@ -235,13 +235,13 @@ class DroneState:
         # Convert relative positioning to absolute
         absolute_target = Pose()
 
-        # absolute_target.position.x = target.position.x + OffboardControl.home_pose.position.x
-        # absolute_target.position.y = target.position.y + OffboardControl.home_pose.position.y
-        # absolute_target.position.z = target.position.z + OffboardControl.home_pose.position.z
+        absolute_target.position.x = target.position.x + OffboardControl.home_pose.position.x
+        absolute_target.position.y = target.position.y + OffboardControl.home_pose.position.y
+        absolute_target.position.z = target.position.z + OffboardControl.home_pose.position.z
 
-        absolute_target.position.x = target.position.x
-        absolute_target.position.y = target.position.y
-        absolute_target.position.z = target.position.z
+        # absolute_target.position.x = target.position.x
+        # absolute_target.position.y = target.position.y
+        # absolute_target.position.z = target.position.z
         absolute_target.orientation = target.orientation
         
         # Start smooth trajectory
