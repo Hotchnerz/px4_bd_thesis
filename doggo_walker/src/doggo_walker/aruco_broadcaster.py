@@ -1,10 +1,6 @@
-#!/usr/bin/env python  
+#!/usr/bin/env python3
 import rospy
-
-# Because of transformations
-import tf_conversions
 from aruco_msgs.msg import MarkerArray
-
 import tf2_ros
 from geometry_msgs.msg import TransformStamped, PoseStamped
 

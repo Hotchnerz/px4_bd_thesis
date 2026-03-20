@@ -1,4 +1,4 @@
-#!/usr/bin/env python  
+#!/usr/bin/env python3
 import rospy
 import tf2_ros
 from geometry_msgs.msg import PoseStamped
@@ -14,7 +14,7 @@ if __name__ == '__main__':
     rate = rospy.Rate(10.0)
     while not rospy.is_shutdown():
         try:
-            trans = tfBuffer.lookup_transform('id_121', 'dock', rospy.Time())
+            trans = tfBuffer.lookup_transform('map', 'dock', rospy.Time())
         except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
             rate.sleep()
             continue
@@ -22,7 +22,7 @@ if __name__ == '__main__':
         msg = PoseStamped()
 
         msg.header.stamp = rospy.Time.now()
-        msg.header.frame_id = "dock"
+        msg.header.frame_id = "map"
         msg.pose.position.x = trans.transform.translation.x
         msg.pose.position.y = trans.transform.translation.y
         msg.pose.position.z = trans.transform.translation.z

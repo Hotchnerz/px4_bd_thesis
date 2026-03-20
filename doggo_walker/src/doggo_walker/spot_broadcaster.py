@@ -1,9 +1,5 @@
-#!/usr/bin/env python  
+#!/usr/bin/env python3
 import rospy
-
-# Because of transformations
-import tf_conversions
-
 import tf2_ros
 from geometry_msgs.msg import TransformStamped, PoseStamped
 

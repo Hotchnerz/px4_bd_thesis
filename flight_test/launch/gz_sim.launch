@@ -50,6 +50,7 @@
     <param name="conn/timesync_mode" value="MAVLINK"/>
   </include>
 
+
   <include file="$(find aruco_ros)/launch/gz_marker_publisher.launch">
   </include>
 

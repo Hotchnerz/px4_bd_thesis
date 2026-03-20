@@ -18,7 +18,7 @@ import copy
 class MissionConfig:
     """Centralized configuration for mission parameters"""
     # Flight parameters
-    FLIGHT_HEIGHT = 1.25
+    FLIGHT_HEIGHT = 0.8
     TAKEOFF_SPEED = 0.3
     APPROACH_SPEED = 0.3
     LANDING_SPEED = 0.2
@@ -230,19 +230,22 @@ class DroneState:
             f"Updating Setpoint - X: {OffboardControl.target_pose.position.x}, Y: {OffboardControl.target_pose.position.y}, Z: {OffboardControl.target_pose.position.z}, YAW: {OffboardControl.target_pose.orientation}"
         )
 
-    def update_setpoint_smooth(self, target, speed=None, trajectory_type="waypoint"):
+    def update_setpoint_smooth(self, target, speed=None, trajectory_type="waypoint", home_offset=False):
         """New smooth setpoint update using cubic interpolation"""
         # Convert relative positioning to absolute
         absolute_target = Pose()
 
-        absolute_target.position.x = target.position.x + OffboardControl.home_pose.position.x
-        absolute_target.position.y = target.position.y + OffboardControl.home_pose.position.y
-        absolute_target.position.z = target.position.z + OffboardControl.home_pose.position.z
-
-        # absolute_target.position.x = target.position.x
-        # absolute_target.position.y = target.position.y
-        # absolute_target.position.z = target.position.z
-        absolute_target.orientation = target.orientation
+        if home_offset == True:
+            absolute_target.position.x = target.position.x + OffboardControl.home_pose.position.x
+            absolute_target.position.y = target.position.y + OffboardControl.home_pose.position.y
+            absolute_target.position.z = target.position.z + OffboardControl.home_pose.position.z
+            absolute_target.orientation = target.orientation
+        
+        else:
+            absolute_target.position.x = target.position.x
+            absolute_target.position.y = target.position.y
+            absolute_target.position.z = target.position.z
+            absolute_target.orientation = target.orientation
         
         # Start smooth trajectory
         self.smooth_trajectory.start_smooth_trajectory(absolute_target, speed, trajectory_type)
@@ -584,7 +587,7 @@ class DroneState:
         take_off_pose.position.z = self.flight_height
         take_off_pose.orientation = OffboardControl.home_pose.orientation
         
-        self.update_setpoint_smooth(take_off_pose, trajectory_type="takeoff")
+        self.update_setpoint_smooth(take_off_pose, trajectory_type="takeoff", home_offset=True)
         
     def set_approach_setpoint(self):
         if not self.offapp_flag:
@@ -654,13 +657,21 @@ class DroneState:
             self.offapp_flag = True
             
         msg = Pose()
-        msg.position.x = self.x_app + OffboardControl.dock_pose.position.x
-        msg.position.y = self.y_app + OffboardControl.dock_pose.position.y
+        # msg.position.x = self.x_app + OffboardControl.dock_pose.position.x
+        # msg.position.y = self.y_app + OffboardControl.dock_pose.position.y
+        # msg.position.z = self.flight_height
+        # msg.orientation = OffboardControl.dock_pose.orientation
+
+        # self.final_x_sp = self.x_app + OffboardControl.dock_pose.position.x
+        # self.final_y_sp = self.y_app + OffboardControl.dock_pose.position.y
+
+        msg.position.x = OffboardControl.dock_pose.position.x
+        msg.position.y = OffboardControl.dock_pose.position.y
         msg.position.z = self.flight_height
         msg.orientation = OffboardControl.dock_pose.orientation
 
-        self.final_x_sp = self.x_app + OffboardControl.dock_pose.position.x
-        self.final_y_sp = self.y_app + OffboardControl.dock_pose.position.y
+        self.final_x_sp = OffboardControl.dock_pose.position.x
+        self.final_y_sp = OffboardControl.dock_pose.position.y
 
         rospy.loginfo(f"Final Marker App: {msg.position.x}, Y: {msg.position.y}")
 
