@@ -4,7 +4,8 @@ import rospy
 from geometry_msgs.msg import PoseStamped, PoseWithCovariance, Pose, TwistStamped, Twist, Point, TransformStamped
 from mavros_msgs.msg import State, ExtendedState, AttitudeTarget
 # from tf.transformations import euler_from_quaternion #Cannot use due to melodic pkgs being built with python2
-from flight_test.transform_utils import euler_from_quaternion
+import tf2_ros
+from flight_test.transform_utils import euler_from_quaternion, pose_to_matrix, matrix_to_pose
 from mavros_msgs.srv import CommandBool, CommandBoolRequest, SetMode, SetModeRequest, CommandLong, CommandLongRequest
 from fg40_msgs.msg import FG40Feedback, FG40MagnetCmd
 from aruco_msgs.msg import MarkerArray, Marker
@@ -30,7 +31,7 @@ class MissionConfig:
     
     # Timing
     PREP_LAND_TIME_SEC = 2.0
-    MOVING_AVG_WINDOW = 20
+    MOVING_AVG_WINDOW = 50
     MAX_SCAN_ATTEMPTS = 25
     MAX_MARKER_DETECT_ATTEMPTS = 25
     
@@ -206,10 +207,35 @@ class DroneState:
         self.state_timer_active = False
         self.scan_time_done = False
         self.land_time_done = False
+        self.fiducial_pose = Pose()
+        self.scan_complete = False
 
         # Add smooth trajectory manager
         self.smooth_trajectory = SmoothTrajectoryManager()
         self.trajectory_complete = False
+        
+        self.tf_buffer = tf2_ros.Buffer()
+        self.tf_listener = tf2_ros.TransformListener(self.tf_buffer)
+
+
+    def get_transform(self, target_frame, source_frame):
+        try:
+            trans = self.tf_buffer.lookup_transform(target_frame, source_frame, rospy.Time(0), rospy.Duration(0.1))
+            return trans
+        except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
+            rospy.logwarn(f"TF lookup failed ({target_frame} -> {source_frame}): {e}")
+            return None
+
+    def transform_to_pose(self, trans):
+        pose = Pose()
+        pose.position.x = trans.transform.translation.x
+        pose.position.y = trans.transform.translation.y
+        pose.position.z = trans.transform.translation.z
+        pose.orientation.x = trans.transform.rotation.x
+        pose.orientation.y = trans.transform.rotation.y
+        pose.orientation.z = trans.transform.rotation.z
+        pose.orientation.w = trans.transform.rotation.w
+        return pose
 
     def test(self):
         return False
@@ -279,7 +305,7 @@ class DroneState:
         msg.position.x = OffboardControl.spot_pose.position.x
         msg.position.y = OffboardControl.spot_pose.position.y
         msg.position.z = self.flight_height
-        msg.orientation = OffboardControl.home_pose.orientation
+        msg.orientation = OffboardControl.spot_pose.orientation
         # self.update_setpoint(msg)
         # rospy.loginfo("Sending Search Setpoint")
         self.update_setpoint_smooth(msg, trajectory_type="search")
@@ -292,9 +318,12 @@ class DroneState:
         
         with OffboardControl.offboard_lock:
             OffboardControl.marker_window.clear()
+            OffboardControl.aruco_found = False
+            OffboardControl.first_aruco_msg = False
 
         self.state_timer_active = False
         self.scan_time_done = False
+
 
     def on_exit_LAND(self, *args):
         # OffboardControl.magnet_publisher("mag")
@@ -302,10 +331,9 @@ class DroneState:
         self.state_timer_active = False
 
     def on_enter_SCAN(self, *args):
-        # self.state_timer_start = rospy.get_rostime()
-        # self.state_timer_active = True
-        # rospy.loginfo("Entered SCAN state - starting 2 second wait...")
-        pass
+        self.scan_attempt = 0
+        self.marker_detect_attempt = 0
+        self.scan_complete = False
 
     def on_enter_LAND(self, *args):
         # self.state_timer_start = rospy.get_rostime()
@@ -366,29 +394,39 @@ class DroneState:
         return found_marker and is_first_msg
 
     def distance_check(self):
+        transform = self.get_transform('map', 'c920_link')
+        camera_pose = self.transform_to_pose(transform)
+
+        map_tform_camera = pose_to_matrix(camera_pose)
+        camera_tform_fiducial = pose_to_matrix(self.fiducial_pose)
+
+        map_T_fiducial = map_tform_camera @ camera_tform_fiducial
+        fiducial_in_map = matrix_to_pose(map_T_fiducial)
+
         distance = np.sqrt(
             np.square(
-                OffboardControl.current_pose.position.x - OffboardControl.aruco_pose.position.x
+                OffboardControl.current_pose.position.x - fiducial_in_map.position.x
             )
             + np.square(
-                OffboardControl.current_pose.position.y - OffboardControl.aruco_pose.position.y
+                OffboardControl.current_pose.position.y - fiducial_in_map.position.y
             )
         )
 
         rospy.loginfo(f"DISTANCE CHECK: {distance}")
 
-        return distance > 0.285
+        return distance > 0.125
 
     def attempt_check(self):
-        self.scan_check()
-        self.marker_found()
-
-        # if self.scan_attempt >= 25 and self.marker_detect_attempt >= 25:
-        #     return True
-        # return False
-        if self.scan_attempt >= MissionConfig.MAX_SCAN_ATTEMPTS and self.marker_detect_attempt >= MissionConfig.MAX_MARKER_DETECT_ATTEMPTS:
+        if (self.scan_attempt >= MissionConfig.MAX_SCAN_ATTEMPTS 
+            and self.marker_detect_attempt >= MissionConfig.MAX_MARKER_DETECT_ATTEMPTS):
             return True
         return False
+        # self.scan_check()
+        # self.marker_found()
+
+        # if self.scan_attempt >= MissionConfig.MAX_SCAN_ATTEMPTS and self.marker_detect_attempt >= MissionConfig.MAX_MARKER_DETECT_ATTEMPTS:
+        #     return True
+        # return False
 
     def setpoint_check(self):
         # Check odom if x500 has reached the setpoint
@@ -476,51 +514,60 @@ class DroneState:
 
     def moving_avg(self):
         # Calculate Moving Average using cumulative sum and window of 10
-        window = 10
+        window = 30
 
         with OffboardControl.offboard_lock:
             marker_copy = list(OffboardControl.marker_window)
 
-        # Always extract fresh data from marker_window
-        sp_x = np.array([p.x for p in marker_copy])
-        sp_y = np.array([p.y for p in marker_copy])
+        # Use only the last 'window' poses
+        recent = marker_copy[-window:]
 
-        # Check if we have enough data points for the moving average
-        if len(sp_x) < window:
-            rospy.logwarn(f"Not enough data points for moving average: {len(sp_x)} < {window}")
-            return np.array([]), np.array([])
+        # Average position
+        avg_x = np.mean([p.position.x for p in recent])
+        avg_y = np.mean([p.position.y for p in recent])
+        avg_z = np.mean([p.position.z for p in recent])
 
-        sum_x = np.empty(len(sp_x) + 1, dtype=np.float64)
-        sum_y = np.empty(len(sp_y) + 1, dtype=np.float64)
-        sum_x[0] = 0.0
-        sum_y[0] = 0.0
-        np.cumsum(sp_x, out=sum_x[1:])
-        np.cumsum(sp_y, out=sum_y[1:])
+        #Take the quaternions and use Markley method 
+        quats = [np.array([p.orientation.x, p.orientation.y, p.orientation.z, p.orientation.w]) for p in recent]
 
-        moving_avg_x = (sum_x[window:] - sum_x[:-window]) / window
-        moving_avg_y = (sum_y[window:] - sum_y[:-window]) / window
+        #Flip quartnernions due to double cover problem
+        for i in range(1, len(quats)):
+            if np.dot(quats[i], quats[0]) < 0:
+                quats[i] = -quats[i]
 
-        return moving_avg_x, moving_avg_y
+        M = np.zeros((4, 4))
+        for q in quats:
+            M += np.outer(q, q)
+        M /= len(quats)
+
+        eigenvalues, eigenvectors = np.linalg.eigh(M)
+        avg_q = eigenvectors[:, -1]
+
+        averaged_pose = Pose()
+        averaged_pose.position.x = avg_x
+        averaged_pose.position.y = avg_y
+        averaged_pose.position.z = avg_z
+        averaged_pose.orientation.x = avg_q[0]
+        averaged_pose.orientation.y = avg_q[1]
+        averaged_pose.orientation.z = avg_q[2]
+        averaged_pose.orientation.w = avg_q[3]
+
+
+        return averaged_pose
 
     def scan_check(self):
+        if self.scan_complete:
+            return True
+
         if (len(OffboardControl.marker_window) == MissionConfig.MOVING_AVG_WINDOW):
-            self.x_app_setpoint_app, self.y_app_setpoint_app = self.moving_avg()
+            self.fiducial_pose = self.moving_avg()
+            self.scan_complete = True
             return True
         self.scan_attempt += 1
         return False
 
-    def set_takeoff_setpoint(self):
-        take_off_pose = Pose()
-        take_off_pose.position.x = 0.0
-        take_off_pose.position.y = 0.0
-        take_off_pose.position.z = self.flight_height
-
-        take_off_pose.orientation = OffboardControl.home_pose.orientation
-        # self.update_setpoint(take_off_pose)
-        self.update_setpoint_smooth(take_off_pose, trajectory_type="takeoff")
-
     def set_takeoff_setpoint_smooth(self):
-        """New smooth takeoff setpoint"""
+        """smooth takeoff setpoint"""
         take_off_pose = Pose()
         take_off_pose.position.x = 0.0
         take_off_pose.position.y = 0.0
@@ -528,90 +575,67 @@ class DroneState:
         take_off_pose.orientation = OffboardControl.home_pose.orientation
         
         self.update_setpoint_smooth(take_off_pose, trajectory_type="takeoff", home_offset=True)
-        
-    def set_approach_setpoint(self):
-        if not self.offapp_flag:
-            self.x_app = np.mean(self.x_app_setpoint_app)
-            self.y_app = np.mean(self.y_app_setpoint_app)
-            self.offapp_flag = True
-
-        msg = Pose()
-        msg.position.x = np.mean(self.x_app_setpoint_app)
-        msg.position.y = np.mean(self.y_app_setpoint_app)
-        msg.position.z = self.flight_height
-        msg.orientation = OffboardControl.dock_pose.orientation
-
-        rospy.loginfo(f"Approaching Marker: {msg.position.x}, Y: {msg.position.y}")
-
-        self.update_setpoint(msg)
-        rospy.loginfo("Approaching Marker")
 
     def set_approach_setpoint_smooth(self):
-        """New smooth approach setpoint"""
+        """approach setpoint"""
+        transform = self.get_transform('map', 'c920_link')
+        camera_pose = self.transform_to_pose(transform)
+
+        map_tform_camera = pose_to_matrix(camera_pose)
+        camera_tform_fiducial = pose_to_matrix(self.fiducial_pose)
+
+        map_T_fiducial = map_tform_camera @ camera_tform_fiducial
+        fiducial_in_map = matrix_to_pose(map_T_fiducial)
+
         if not self.offapp_flag:
-            self.x_app = np.mean(self.x_app_setpoint_app)
-            self.y_app = np.mean(self.y_app_setpoint_app)
+            self.x_app = fiducial_in_map.position.x
+            self.y_app = fiducial_in_map.position.y
             self.offapp_flag = True
 
         msg = Pose()
-        msg.position.x = np.mean(self.x_app_setpoint_app)
-        msg.position.y = np.mean(self.y_app_setpoint_app)
+        msg.position.x = fiducial_in_map.position.x
+        msg.position.y = fiducial_in_map.position.y
         msg.position.z = self.flight_height
-        msg.orientation = OffboardControl.dock_pose.orientation
+        msg.orientation = fiducial_in_map.orientation
 
         rospy.loginfo(f"Approaching Marker: {msg.position.x}, Y: {msg.position.y}")
 
         self.update_setpoint_smooth(msg, trajectory_type="approach")
         rospy.loginfo("Starting smooth approach to marker")
 
-    def set_finapp_setpoint(self):
-        if not self.offapp_flag:
-            self.x_app = np.mean(self.x_app_setpoint_app)
-            self.y_app = np.mean(self.y_app_setpoint_app)
-            self.offapp_flag = True
-            # rospy.loginfo(f"X_ and Y_ app_setpoint_app IN IFNOT: {self.x_app_setpoint_app}, Y: {self.y_app_setpoint_app}")
-            # rospy.loginfo(f"X_ and Y_ App MEAN IFNOT: {self.x_app}, Y: {self.y_app}")
-
-        rospy.loginfo(f"X_ and Y_ app_setpoint_app: {self.x_app_setpoint_app}, Y: {self.y_app_setpoint_app}")
-        rospy.loginfo(f"X_ and Y_ App MEAN: {self.x_app}, Y: {self.y_app}")
-
-        msg = Pose()
-        msg.position.x = self.x_app + OffboardControl.dock_pose.position.x
-        msg.position.y = self.y_app + OffboardControl.dock_pose.position.y
-        msg.position.z = self.flight_height
-        msg.orientation = OffboardControl.dock_pose.orientation
-
-        self.final_x_sp = self.x_app + OffboardControl.dock_pose.position.x
-        self.final_y_sp = self.y_app + OffboardControl.dock_pose.position.y
-
-        rospy.loginfo(f"Final Marker App: {msg.position.x}, Y: {msg.position.y}")
-
-        self.update_setpoint(msg)
-        rospy.loginfo("Final Approach...")
-
     def set_finapp_setpoint_smooth(self):
-        """New smooth final approach setpoint"""
-        if not self.offapp_flag:
-            self.x_app = np.mean(self.x_app_setpoint_app)
-            self.y_app = np.mean(self.y_app_setpoint_app)
-            self.offapp_flag = True
+        """final approach setpoint"""
+
+        #Use the average fiduical pose and move to the dock_pose
+        transform_dock_pose = self.get_transform('id_121', 'dock')
+        dock_pose = self.transform_to_pose(transform_dock_pose)
+
+        transform_camera_pose = self.get_transform('map', 'c920_link')
+        camera_pose = self.transform_to_pose(transform_camera_pose)
+
+        fiducial_tform_dock = pose_to_matrix(dock_pose)
+        camera_tform_fiducial = pose_to_matrix(self.fiducial_pose)
+        map_tform_camera = pose_to_matrix(camera_pose)
+
+        camera_tform_dock = camera_tform_fiducial @ fiducial_tform_dock
+        map_tform_dock = map_tform_camera @ camera_tform_dock
+
+        dock_in_map = matrix_to_pose(map_tform_dock)
+
+        # if not self.offapp_flag:
+        #     self.x_app = fiducial_in_map.position.x
+        #     self.y_app = fiducial_in_map.position.y
+        #     self.offapp_flag = True
             
         msg = Pose()
-        # msg.position.x = self.x_app + OffboardControl.dock_pose.position.x
-        # msg.position.y = self.y_app + OffboardControl.dock_pose.position.y
-        # msg.position.z = self.flight_height
-        # msg.orientation = OffboardControl.dock_pose.orientation
 
-        # self.final_x_sp = self.x_app + OffboardControl.dock_pose.position.x
-        # self.final_y_sp = self.y_app + OffboardControl.dock_pose.position.y
-
-        msg.position.x = OffboardControl.dock_pose.position.x
-        msg.position.y = OffboardControl.dock_pose.position.y
+        msg.position.x = dock_in_map.position.x
+        msg.position.y = dock_in_map.position.y
         msg.position.z = self.flight_height
-        msg.orientation = OffboardControl.dock_pose.orientation
+        msg.orientation = OffboardControl.spot_pose.orientation
 
-        self.final_x_sp = OffboardControl.dock_pose.position.x
-        self.final_y_sp = OffboardControl.dock_pose.position.y
+        self.final_x_sp = dock_in_map.position.x
+        self.final_y_sp = dock_in_map.position.y
 
         rospy.loginfo(f"Final Marker App: {msg.position.x}, Y: {msg.position.y}")
 
@@ -717,7 +741,7 @@ class OffboardControl:
         self.aruco_subscriber = rospy.Subscriber("/aruco_marker_publisher/markers", MarkerArray, self.aruco_callback)
 
         self.thrust_subscriber = rospy.Subscriber("/mavros/setpoint_raw/target_attitude", AttitudeTarget, self.thrust_callback)
-        self.spot_pos_subscriber = rospy.Subscriber("/spot_pose", PoseStamped, self.spot_pos_callback)
+        self.spot_pos_subscriber = rospy.Subscriber("/fid_off_pose", PoseStamped, self.spot_pos_callback)
         self.dock_pos_subscriber = rospy.Subscriber("/dock_pose", PoseStamped, self.dock_pos_callback)
 
         # Clients
@@ -926,41 +950,31 @@ class OffboardControl:
 
 
     def aruco_callback(self, msg):
-        
+        found_121 = False
         for marker in msg.markers:
-            if marker.id == 121:
-                if marker.confidence > 0.8 and self.droneState.state == "SCAN":
-                    with OffboardControl.offboard_lock:
-                        OffboardControl.aruco_found = True
-                        if not OffboardControl.first_aruco_msg and OffboardControl.aruco_found:
-                            OffboardControl.first_aruco_msg = True
-                    
-                    #Assuming Hamilton convention
-                    # Want to remove this later...
-                    OffboardControl.aruco_pose = marker.pose.pose
-                    aruco_rpy = euler_from_quaternion(marker.pose.pose.orientation)
+            if marker.id == 121 and marker.confidence > 0.8 and self.droneState.state == "SCAN":
+                found_121 = True
+                marker_poses = marker.pose.pose
 
-                    marker_position = Point()
-                    marker_position = marker.pose.pose.position
-
-                    with OffboardControl.offboard_lock:
-                        if (len(OffboardControl.marker_window) < MissionConfig.MOVING_AVG_WINDOW):
-                            OffboardControl.marker_window.append(marker_position)
-                        elif (len(OffboardControl.marker_window) == MissionConfig.MOVING_AVG_WINDOW):
-                            OffboardControl.marker_window.pop(0)
-                            OffboardControl.marker_window.append(marker_position)
-
-            else:
                 with OffboardControl.offboard_lock:
-                    OffboardControl.aruco_found = False
+                    if not OffboardControl.first_aruco_msg:
+                        OffboardControl.first_aruco_msg = True
+                    if len(OffboardControl.marker_window) < MissionConfig.MOVING_AVG_WINDOW:
+                        OffboardControl.marker_window.append(marker_poses)
+                    else:
+                        OffboardControl.marker_window.pop(0)
+                        OffboardControl.marker_window.append(marker_poses)
+                break
+
+        with OffboardControl.offboard_lock:
+            OffboardControl.aruco_found = found_121
 
 
     def fg40_status_callback(self, msg):
         self.mag_status = msg
 
     def spot_pos_callback(self, msg):
-        # OffboardControl.spot_pose = msg.pose
-        pass
+        OffboardControl.spot_pose = msg.pose
 
 
     def dock_pos_callback(self, msg):
@@ -985,20 +999,6 @@ class OffboardControl:
         
         rospy.loginfo(f"Command {command} sent with response: {resp}")
         return resp.success
-
-
-    # def trajectory_setpoint_publisher(self):
-    #     rate = rospy.Rate(self.sp_pub_rate)
-        
-    #     while not rospy.is_shutdown() and not OffboardControl.stop_pub_thread.is_set():
-    #         msg = PoseStamped()
-    #         msg.pose = OffboardControl.target_pose
-    #         self.setpoint_publisher.publish(msg)
-
-    #         if OffboardControl.offboard_counter <= 100:
-    #             OffboardControl.offboard_counter += 1
-
-    #         rate.sleep()
 
     def trajectory_setpoint_publisher(self):
         """Enhanced publisher that handles smooth trajectory updates"""
@@ -1034,21 +1034,6 @@ class OffboardControl:
         elif cmd == "demagnetize" or cmd == "demag" or cmd == "dm":
             msg.cmd_magnet = 0
             self.magnet_cmd_pub.publish(msg)
-
-    # def state_parser(self):
-    #     """Launch State thread, to enter offboard control loop. ARM state will start the setpoint publisher thread."""
-    #     rate = rospy.Rate(self.control_rate)
-    #     while not rospy.is_shutdown():
-    #         rospy.loginfo(f"CURRENT STATE: {self.droneState.state}")
-    #         self.droneState.trs_next()
-            
-    #         if self.droneState.state == "DISARM":
-    #             rospy.loginfo("Magnetizing FG40...")
-    #             self.magnet_publisher("mag")
-    #             self.magnet_publisher("mag")
-    #             self.disarm()
-
-    #         rate.sleep()
 
     def state_parser(self):
         """Enhanced state parser with trajectory progress logging"""
