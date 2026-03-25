@@ -21,9 +21,9 @@ def pretty_print_waypoints(waypoint_id, waypoint_name, short_code_to_count, loca
         short_code = '  '  # If the short code is not valid/unique, don't show it.
 
     waypoint_symbol = '->' if localization_id == waypoint_id else '  '
-    print(
-        f'{waypoint_symbol} Waypoint name: {waypoint_name} id: {waypoint_id} short code: {short_code}'
-    )
+    # print(
+    #     f'{waypoint_symbol} Waypoint name: {waypoint_name} id: {waypoint_id} short code: {short_code}'
+    # )
 
 
 def find_unique_waypoint_id(short_code, graph, name_to_id):
@@ -115,9 +115,9 @@ def update_waypoints_and_edges(graph, localization_id, do_print=True):
                 edges[edge.id.to_waypoint].append(edge.id.from_waypoint)
         else:
             edges[edge.id.to_waypoint] = [edge.id.from_waypoint]
-        if not do_print:
-            print(f'(Edge) from waypoint {edge.id.from_waypoint} to waypoint {edge.id.to_waypoint} '
-                  f'(cost {edge.annotations.cost.value})')
+        # if not do_print:
+        #     print(f'(Edge) from waypoint {edge.id.from_waypoint} to waypoint {edge.id.to_waypoint} '
+        #           f'(cost {edge.annotations.cost.value})')
 
     return name_to_id, edges, ordered_ids
 

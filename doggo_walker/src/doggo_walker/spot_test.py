@@ -51,8 +51,7 @@ class SpotBodyPublisher:
         self._payload_registration_client = None
         self._graph_nav_client = None
 
-        #self._upload_filepath = "../../autowalks/x500_mock_inspectiom.walk"
-        self._upload_filepath = "/home/radam/distrobox/bd_home/thesis_ws/src/doggo_walker/autowalks/simple_x500_inspection.walk"
+        self._upload_filepath = "/home/marslab/catkin_ws/src/doggo_walker/autowalks/x500_simple_fullsystems.walk"
 
         # Store the most recent knowledge of the state of the robot based on rpc calls.
         self._current_graph = None
@@ -70,12 +69,12 @@ class SpotBodyPublisher:
         self.nominal_pose = None
 
         #Get and store payload creds
-        self.deployed_guid, self.deployed_secret = bosdyn.client.util.read_payload_credentials("/home/radam/distrobox/bd_home/thesis_ws/src/doggo_walker/payload_creds/x500_undocked")
-        self.docked_guid, self.docked_secret = bosdyn.client.util.read_payload_credentials("/home/radam/distrobox/bd_home/thesis_ws/src/doggo_walker/payload_creds/x500_docked")
+        self.deployed_guid, self.deployed_secret = bosdyn.client.util.read_payload_credentials("/home/marslab/catkin_ws/src/doggo_walker/payload_creds/x500_undocked")
+        self.docked_guid, self.docked_secret = bosdyn.client.util.read_payload_credentials("/home/marslab/catkin_ws/src/doggo_walker/payload_creds/x500_docked")
 
         #Ensure ROS Clients
         #rospy.wait_for_service('/mission_service')
-        self.qc_service = rospy.ServiceProxy('/mission_service', mission)
+        #self.qc_service = rospy.ServiceProxy('/mission_service', mission)
 
 
     def get_creds(self):
@@ -258,6 +257,7 @@ class SpotBodyPublisher:
         blocking_command(self._command_client, test_cmd, check_stance_status)
 
     def takeoff_qc_prepare(self):
+        rospy.loginfo("Intializing VIO estimate...")
         self.zupvt_init()
         self.prepare_spot()
         takeoff_request = missionRequest()
@@ -269,6 +269,7 @@ class SpotBodyPublisher:
         if result:
             self.x500_undocking()
             self.revert_pose()
+        # self.revert_pose()
 
     def landing_qc_prepare(self):
         self.prepare_spot()
@@ -280,6 +281,7 @@ class SpotBodyPublisher:
         if result:
             self.x500_docking()
             self.revert_pose()
+        #self.revert_pose()
 
     def x500_undocking(self):
         #Unregister x500_docked
@@ -613,7 +615,82 @@ class SpotBodyPublisher:
             return False
 
     def pose_spot(self):
-        pass
+
+
+        # Tell the robot to stand in a twisted position.
+        #
+        # The RobotCommandBuilder constructs command messages, which are then
+        # issued to the robot using "robot_command" on the command client.
+        #
+        # In this example, the RobotCommandBuilder generates a stand command
+        # message with a non-default rotation in the footprint frame. The footprint
+        # frame is a gravity aligned frame with its origin located at the geometric
+        # center of the feet. The X axis of the footprint frame points forward along
+        # the robot's length, the Z axis points up aligned with gravity, and the Y
+        # axis is the cross-product of the two.
+        # footprint_R_body = bosdyn.geometry.EulerZXY(yaw=0.4, roll=0.0, pitch=0.0)
+        # cmd = RobotCommandBuilder.synchro_stand_command(footprint_R_body=footprint_R_body)
+        # command_client.robot_command(cmd)
+        # robot.logger.info('Robot standing twisted.')
+        # time.sleep(3)
+
+        robot_state = self._state_client.get_robot_state()
+        odom_T_flat_body = get_a_tform_b(robot_state.kinematic_state.transforms_snapshot,
+                                         frame_helpers.ODOM_FRAME_NAME, frame_helpers.GRAV_ALIGNED_BODY_FRAME_NAME)
+        # Now compute an absolute desired position and orientation of the robot body origin.
+        # Use the frame helper class to compute the world to gravity aligned body frame transformation.
+        # Note, the robot_state used here was cached from before the above yaw stand command,
+        # so it contains the nominal stand pose.
+
+
+        # Specify a trajectory to shift the body forward followed by looking down, then return to nominal.
+        # Define times (in seconds) for each point in the trajectory.
+        t1 = 0.0
+        t2 = 0.5
+        t3 = 6.0
+        t4 = 6.5
+
+        # Scan up and down once
+        # flat_body_T_pose1 = math_helpers.SE3Pose(x=0.0, y=0, z=0, rot=math_helpers.Quat(w=0.9848, x=0, y=0.1736, z=0))
+        # flat_body_T_pose2 = math_helpers.SE3Pose(
+        #     x=0.0, y=0, z=0, rot=math_helpers.Quat(w=0.9848, x=0, y=-0.1736, z=0))
+        # flat_body_T_pose3 = math_helpers.SE3Pose(x=0.0, y=0, z=0, rot=math_helpers.Quat())
+    
+        # Scan right to left once.
+        # flat_body_T_pose1 = math_helpers.SE3Pose(x=0.0, y=0, z=0, rot=math_helpers.Quat(w=0.9659, x=0, y=0, z=-0.2588))
+        # flat_body_T_pose2 = math_helpers.SE3Pose(
+        #     x=0.0, y=0, z=0, rot=math_helpers.Quat(w=0.9659, x=0, y=0, z=0.2588))
+        # flat_body_T_pose3 = math_helpers.SE3Pose(x=0.0, y=0, z=0, rot=math_helpers.Quat())
+
+        # Scan right to left once BUT looking down.
+        flat_body_T_pose1 = math_helpers.SE3Pose(x=0.0, y=0, z=0, rot=math_helpers.Quat())
+        flat_body_T_pose2 = math_helpers.SE3Pose(x=0.0, y=0, z=0, rot=math_helpers.Quat(w=0.9512, x=0.0449, y=0.1677, z=-0.2549))
+        flat_body_T_pose3 = math_helpers.SE3Pose(
+            x=0.0, y=0, z=0, rot=math_helpers.Quat(w=0.9512, x=-0.0449, y=0.1677, z=0.2549))
+        flat_body_T_pose4 = math_helpers.SE3Pose(x=0.0, y=0, z=0, rot=math_helpers.Quat())
+
+        # Build the points in the trajectory.
+        traj_point1 = trajectory_pb2.SE3TrajectoryPoint(
+            pose=(odom_T_flat_body * flat_body_T_pose1).to_proto(),
+            time_since_reference=seconds_to_duration(t1))
+        traj_point2 = trajectory_pb2.SE3TrajectoryPoint(
+            pose=(odom_T_flat_body * flat_body_T_pose2).to_proto(),
+            time_since_reference=seconds_to_duration(t2))
+        traj_point3 = trajectory_pb2.SE3TrajectoryPoint(
+            pose=(odom_T_flat_body * flat_body_T_pose3).to_proto(),
+            time_since_reference=seconds_to_duration(t3))
+        traj_point4 = trajectory_pb2.SE3TrajectoryPoint(
+            pose=(odom_T_flat_body * flat_body_T_pose4).to_proto(),
+            time_since_reference=seconds_to_duration(t4))
+
+        # Build the trajectory proto by combining the points.
+        traj = trajectory_pb2.SE3Trajectory(points=[traj_point1, traj_point2, traj_point3, traj_point4])
+
+        body_control = spot_command_pb2.BodyControlParams(
+            body_pose=spot_command_pb2.BodyControlParams.BodyPose(root_frame_name=frame_helpers.ODOM_FRAME_NAME,
+                                                                  base_offset_rt_root=traj))
+        blocking_stand(self._command_client, timeout_sec=10,
+                       params=spot_command_pb2.MobilityParams(body_control=body_control))
 
     def mock_autowalk(self):
         # Clear any graphs on the Spot robot
@@ -651,23 +728,23 @@ class SpotBodyPublisher:
 
         ###simple_x500_inspection###
         rospy.loginfo("Starting Mission...")
-        self.nav_route(target_waypoints[1:3])
+        self.nav_route(target_waypoints[1:10])
         
         #Give sometime to start the hardware launch
-        ospy.loginfo("START THE HARDWARE.LAUNCH ROS LAUNCH FILE AND BAG FILE!")
-        time.sleep(18.0)
+        rospy.loginfo("START THE HARDWARE.LAUNCH ROS LAUNCH FILE AND BAG FILE!")
+        time.sleep(30.0)
         self.takeoff_qc_prepare()
         time.sleep(1.5)
         
         #Go to Inspection Point 1
-        rospy.loginfo("Going to Inspection Point 1")
+        rospy.loginfo("Sending X500 Inspection Points...")
         inspect_request = missionRequest()
         mission_sps = PoseArray()
         sp_1 = Pose()
 
-        sp_1.position.x = 1.5
-        sp_1.position.y = -1.35
-        sp_1.position.z = 1.5
+        sp_1.position.x = 1.70
+        sp_1.position.y = 0.85
+        sp_1.position.z = 0.80
 
         sp_1.orientation.x = 0
         sp_1.orientation.y = 0
@@ -683,12 +760,17 @@ class SpotBodyPublisher:
         result = self.qc_service(inspect_request)
 
         if result:
-            self.nav_route(target_waypoints[3:6])
-        
+            rospy.loginfo("Going to Inspection Point 1")
+            self.nav_route(target_waypoints[10:12])
+            self.pose_spot()
+        # self.nav_route(target_waypoints[10:12])
+
+        rospy.loginfo("Spot is done inspecting. Going to RZ...")
         time.sleep(1.5)
         
-        # Go to Inspection Point 2
-        self.nav_route(target_waypoints[6:13])
+        # Go to RZ
+        self.nav_route(target_waypoints[12:])
+        rospy.loginfo("Prepare Spot to land X500...")
         self.landing_qc_prepare()
         time.sleep(1.5)
 
