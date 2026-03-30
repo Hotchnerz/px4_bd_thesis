@@ -51,7 +51,7 @@ class SpotBodyPublisher:
         self._payload_registration_client = None
         self._graph_nav_client = None
 
-        self._upload_filepath = "/home/marslab/catkin_ws/src/doggo_walker/autowalks/x500_simple_fullsystems.walk"
+        self._upload_filepath = "/home/marslab/catkin_ws/src/doggo_walker/autowalks/x500_finalz.walk"
 
         # Store the most recent knowledge of the state of the robot based on rpc calls.
         self._current_graph = None
@@ -73,8 +73,8 @@ class SpotBodyPublisher:
         self.docked_guid, self.docked_secret = bosdyn.client.util.read_payload_credentials("/home/marslab/catkin_ws/src/doggo_walker/payload_creds/x500_docked")
 
         #Ensure ROS Clients
-        #rospy.wait_for_service('/mission_service')
-        #self.qc_service = rospy.ServiceProxy('/mission_service', mission)
+        rospy.wait_for_service('/mission_service')
+        self.qc_service = rospy.ServiceProxy('/mission_service', mission)
 
 
     def get_creds(self):
@@ -191,14 +191,14 @@ class SpotBodyPublisher:
         # t3 = 1.125
         # t4 = 1.5
     
-        t1 = 0.5
+        t1 = 0.6
         t2 = 1.0
-        t3 = 1.5
-        t4 = 2.0
+        t3 = 3.0
+        t4 = 3.5
 
         # Specify the poses as transformations to the cached flat_body pose.
         flat_body_T_pose1 = math_helpers.SE3Pose(x=0, y=0, z=-0.5, rot=math_helpers.Quat())
-        flat_body_T_pose2 = math_helpers.SE3Pose(x=0.0, y=0, z=0.5, rot=math_helpers.Quat())
+        flat_body_T_pose2 = math_helpers.SE3Pose(x=0.0, y=0, z=0.0, rot=math_helpers.Quat())
         flat_body_T_pose3 = math_helpers.SE3Pose(x=0.0, y=0, z=-0.5, rot=math_helpers.Quat())
         flat_body_T_pose4 = math_helpers.SE3Pose(x=0.0, y=0, z=0.0, rot=math_helpers.Quat())
 
@@ -217,7 +217,9 @@ class SpotBodyPublisher:
             time_since_reference=seconds_to_duration(t4))
 
         # Build the trajectory proto by combining the points.
-        traj = trajectory_pb2.SE3Trajectory(points=[traj_point1, traj_point2, traj_point3, traj_point4])
+        #traj = trajectory_pb2.SE3Trajectory(points=[traj_point1, traj_point2, traj_point3, traj_point4])
+
+        traj = trajectory_pb2.SE3Trajectory(points=[traj_point1, traj_point2])
 
         # Build a custom mobility params to specify absolute body control.
         body_control = spot_command_pb2.BodyControlParams(
@@ -257,9 +259,16 @@ class SpotBodyPublisher:
         blocking_command(self._command_client, test_cmd, check_stance_status)
 
     def takeoff_qc_prepare(self):
+        self.prepare_spot()
+
+        #Give sometime to start the hardware launch
+        rospy.loginfo("START THE HARDWARE.LAUNCH ROS LAUNCH FILE AND BAG FILE!")
+        time.sleep(40.0)
+
         rospy.loginfo("Intializing VIO estimate...")
         self.zupvt_init()
-        self.prepare_spot()
+        time.sleep(2.0)
+
         takeoff_request = missionRequest()
 
         takeoff_request.stateRequest = 'BREAKAWAY'
@@ -280,6 +289,7 @@ class SpotBodyPublisher:
 
         if result:
             self.x500_docking()
+            time.sleep(1.0)
             self.revert_pose()
         #self.revert_pose()
 
@@ -728,11 +738,7 @@ class SpotBodyPublisher:
 
         ###simple_x500_inspection###
         rospy.loginfo("Starting Mission...")
-        self.nav_route(target_waypoints[1:10])
-        
-        #Give sometime to start the hardware launch
-        rospy.loginfo("START THE HARDWARE.LAUNCH ROS LAUNCH FILE AND BAG FILE!")
-        time.sleep(30.0)
+        self.nav_route(target_waypoints[1:8])
         self.takeoff_qc_prepare()
         time.sleep(1.5)
         
@@ -761,7 +767,7 @@ class SpotBodyPublisher:
 
         if result:
             rospy.loginfo("Going to Inspection Point 1")
-            self.nav_route(target_waypoints[10:12])
+            self.nav_route(target_waypoints[8:10])
             self.pose_spot()
         # self.nav_route(target_waypoints[10:12])
 
@@ -769,7 +775,7 @@ class SpotBodyPublisher:
         time.sleep(1.5)
         
         # Go to RZ
-        self.nav_route(target_waypoints[12:])
+        self.nav_route(target_waypoints[10:13])
         rospy.loginfo("Prepare Spot to land X500...")
         self.landing_qc_prepare()
         time.sleep(1.5)
@@ -790,3 +796,4 @@ if __name__ == '__main__':
     # node.test_localization()
     #node.nav_to_waypoint("sneezy-gadfly-qSLBadUY.hL7LByNUKQaNQ==")
     node.mock_autowalk()
+    #node.zupvt_init()
