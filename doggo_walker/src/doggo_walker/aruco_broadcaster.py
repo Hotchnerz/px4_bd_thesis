@@ -1,8 +1,5 @@
-#!/usr/bin/env python  
+#!/usr/bin/env python3
 import rospy
-
-# Because of transformations
-import tf_conversions
 from aruco_msgs.msg import MarkerArray
 
 import tf2_ros
@@ -14,7 +11,7 @@ def aruco_pose(msg):
     t = TransformStamped()
 
     t.header.stamp = rospy.Time.now()
-    t.header.frame_id = "map"
+    t.header.frame_id = "c920_link"
     t.child_frame_id = "id_121"
     t.transform.translation.x = msg.markers[0].pose.pose.position.x
     t.transform.translation.y = msg.markers[0].pose.pose.position.y

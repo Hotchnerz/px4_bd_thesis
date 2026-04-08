@@ -57,8 +57,8 @@
   <!--<depend>mav_planning_msgs</depend>
   <depend>mav_trajectory_generation</depend>
   <depend>mav_trajectory_generation_ros</depend>
-
-  <exec_depend>message_generation</exec_depend>
+    -->
+  <exec_depend>message_runtime</exec_depend>
     -->
 
 

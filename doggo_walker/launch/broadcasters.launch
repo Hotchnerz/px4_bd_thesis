@@ -1,8 +1,13 @@
 <launch>
 
-    <node pkg="tf2_ros" type="static_transform_publisher" name="aruco_to_dock"
-        args ="-0.48 0.05 0.14 0.0 0.0 0.0 1.0 id_121 dock" />
+    <!-- node pkg="tf2_ros" type="static_transform_publisher" name="aruco_to_dock"
+        args ="-0.48 0.05 0.14 0.0 0.0 0.0 1.0 id_121 dock" /> -->
 
+    <node pkg="tf2_ros" type="static_transform_publisher" name="aruco_to_dock"
+        args ="-0.46053 0.0 0.0895 0.0 0.0 0.0 1.0 id_121 dock" />
+
+    <node pkg="tf2_ros" type="static_transform_publisher" name="fidd_to_spot_body"
+        args ="0.28218 0.0 0.08744 0.0 0.0 0.0 1.0 spot_body fid_off" />
 
     <node name="aruco_broadcaster" pkg="doggo_walker" type="aruco_broadcaster.py" output="screen" />
 

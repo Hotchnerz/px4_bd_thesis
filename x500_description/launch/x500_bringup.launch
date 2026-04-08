@@ -23,8 +23,14 @@
    <!-- <node pkg="tf2_ros" type="static_transform_publisher" name="cam0_to_corrpose"
 	args ="0.0 0.0 0.0 0.0 0.0 0.0 1.0 cam0 corr_pose" /> -->
 
-   <node pkg="tf2_ros" type="static_transform_publisher" name="rpicam_to_d455link"
-	args ="-0.011 -0.048 -0.032 -0.7071068 0.7071068 0.0 0.0 d455_link csi_cam_0_link" />
+   <!-- <node pkg="tf2_ros" type="static_transform_publisher" name="rpicam_to_d455link"
+	args ="-0.011 -0.048 -0.032 -0.7071068 0.7071068 0.0 0.0 d455_link csi_cam_0_link" /> -->
+
+   <!-- node pkg="tf2_ros" type="static_transform_publisher" name="rpicam_to_baselink"
+	 args ="0.09275 0.0 -0.05612 0.707 0.707 0.0 0.0 base_link csi_cam_0_link" /> -->
+
+   <node pkg="tf2_ros" type="static_transform_publisher" name="c920_to_baselink"
+	args ="0.09275 0.0 -0.05612  -0.707 0.707 0.0 0.0 base_link c920_link" />
 
 </launch>
 

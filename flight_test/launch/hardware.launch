@@ -23,6 +23,8 @@
 
 	<node name="spot_pose" pkg="doggo_walker" type="spot_bridge.py" output="screen" /> 
 
+	<node name="fid_off_pose" pkg="doggo_walker" type="fid_search_off.py" output="screen" />
+
   	<include file="$(find doggo_walker)/launch/broadcasters.launch">
   	</include>
 

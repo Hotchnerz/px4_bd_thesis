@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import threading
 import rospy
-from geometry_msgs.msg import PoseStamped, PoseWithCovariance, Pose, TwistStamped, Twist, Point, TransformStamped
+from geometry_msgs.msg import PoseStamped, PoseWithCovariance, Pose, TwistStamped, Twist, Point, TransformStamped, PoseArray
 from mavros_msgs.msg import State, ExtendedState, AttitudeTarget
 # from tf.transformations import euler_from_quaternion #Cannot use due to melodic pkgs being built with python2
 import tf2_ros
@@ -12,13 +12,14 @@ from aruco_msgs.msg import MarkerArray, Marker
 import numpy as np
 from transitions import Machine
 from transitions.extensions.states import add_state_features, Timeout
+from flight_test.srv import mission, missionResponse
 import copy
 
 # Configuration Management
 class MissionConfig:
     """Centralized configuration for mission parameters"""
     # Flight parameters
-    FLIGHT_HEIGHT = 1.5
+    FLIGHT_HEIGHT = 0.8
     TAKEOFF_SPEED = 0.3
     APPROACH_SPEED = 0.3
     LANDING_SPEED = 0.2
@@ -301,15 +302,16 @@ class DroneState:
         rospy.loginfo(f"Home Position Recorded: {OffboardControl.home_pose}")
 
     def on_exit_LOITER(self, *args):
-        msg = Pose()
-        msg.position.x = OffboardControl.spot_pose.position.x
-        msg.position.y = OffboardControl.spot_pose.position.y
-        msg.position.z = self.flight_height
-        msg.orientation = OffboardControl.spot_pose.orientation
-        # self.update_setpoint(msg)
-        # rospy.loginfo("Sending Search Setpoint")
-        self.update_setpoint_smooth(msg, trajectory_type="search")
-        rospy.loginfo("Sending Search Setpoint")
+        if not OffboardControl.on_mission and not OffboardControl.start_mission:
+            msg = Pose()
+            msg.position.x = OffboardControl.spot_pose.position.x
+            msg.position.y = OffboardControl.spot_pose.position.y
+            msg.position.z = self.flight_height
+            msg.orientation = OffboardControl.home_pose.orientation
+            # self.update_setpoint(msg)
+            # rospy.loginfo("Sending Search Setpoint")
+            self.update_setpoint_smooth(msg, trajectory_type="search")
+            rospy.loginfo("Sending Search Setpoint")
 
     def on_exit_SCAN(self, *args):
         self.reset_moving_avg = False
@@ -357,6 +359,22 @@ class DroneState:
         # rospy.loginfo("DRONE IS ABORTING LANDING. CAUTION...")
         self.update_setpoint_smooth(msg, trajectory_type="abort")
         rospy.loginfo("DRONE IS ABORTING LANDING. CAUTION...")
+
+    def on_enter_TASK(self, *args):
+        msg = Pose()
+        msg.position.x = OffboardControl.mission_sps.poses[0].position.x
+        msg.position.y = OffboardControl.mission_sps.poses[0].position.y
+        msg.position.z = self.flight_height
+        msg.orientation = OffboardControl.mission_sps.poses[0].orientation
+
+        self.update_setpoint_smooth(msg)
+        rospy.loginfo("TASK RECIEVED. Moving to first waypoint.")
+    
+    def on_exit_TASK(self, *args):
+        OffboardControl.done_mission = False
+        OffboardControl.start_mission = False
+        OffboardControl.on_mission = False
+        OffboardControl.mission_sps = PoseArray()
 
     def on_enter_MAN_OVERRIDE(self, *args):
         self.stop_thread()
@@ -468,6 +486,47 @@ class DroneState:
         # If trajectory complete, check if drone has settled at position
         return self.setpoint_check()  # Use original position/velocity check
 
+    def prog_mission_check(self):
+        #I think here it should check the progress of the mission right
+        #on_ENTER_TASK --> First setpoint in the array should be sent
+        #Do this check below, It is at the setpoint and it is level this is good
+        if self.setpoint_check_smooth() and self.attitude_check() and OffboardControl.mission_sps:
+            #It is safe to assume you made it to the waypoint. Preapre to send a new one from the OffboardControl.mission_sps variable
+            OffboardControl.waypoint_index += 1
+        else:
+            sp = self.setpoint_check_smooth()
+            ap = self.attitude_check()
+            return False
+        #If it is, check if there you are at the end of the array. If you are not at the end, go to the next item and update the setpoint.
+        if OffboardControl.waypoint_index < len(OffboardControl.mission_sps.poses):
+            rospy.loginfo("UPDATING SETPOINT")
+            msg = Pose()
+            msg.position.x = OffboardControl.mission_sps.poses[OffboardControl.waypoint_index].position.x
+            msg.position.y = OffboardControl.mission_sps.poses[OffboardControl.waypoint_index].position.y
+            msg.position.z = self.flight_height
+            msg.orientation = OffboardControl.mission_sps.poses[OffboardControl.waypoint_index].orientation
+
+            self.update_setpoint_smooth(msg)
+            
+            return False
+        #If you are at the end of the list. Return the condition that puts the quad back into LOITER!
+        else:
+            rospy.loginfo("TRUE AND SUCCESS")
+            OffboardControl.done_mission = True
+            return True
+
+        #I think I can remove this 
+        #return OffboardControl.on_mission
+
+    def done_mission_check(self):
+        return OffboardControl.done_mission
+
+    def spot_reqland_check(self):
+        #rospy.loginfo(f"spot_reqland_check:{OffboardControl.land_requested}")
+        return OffboardControl.land_requested
+
+    def start_mission_check(self):
+        return OffboardControl.start_mission and OffboardControl.on_mission
 
     def attitude_check(self):
         # Check if x500 is level
@@ -705,6 +764,13 @@ class OffboardControl:
     stop_pub_thread = None
     pub_thread = None
 
+    mission_sps = PoseArray()
+    waypoint_index = 0
+    on_mission = False
+    start_mission = False
+    land_requested = False
+    done_mission = False
+
     offboard_lock = threading.RLock()
 
     def __init__(self):
@@ -715,11 +781,13 @@ class OffboardControl:
 
         self.sp_pub_rate = MissionConfig.SETPOINT_RATE_HZ
         self.control_rate = MissionConfig.CONTROL_RATE_HZ
-        #self.rate = rospy.Rate(self.rate_hz)
 
         OffboardControl.stop_pub_thread = threading.Event()
         OffboardControl.pub_thread = threading.Thread(target=self.trajectory_setpoint_publisher)
         OffboardControl.pub_thread.daemon = True
+    
+        #Services
+        self.mission_srv = rospy.Service('mission_service', mission, self.service_callback)
 
         # Publishers
         self.magnet_cmd_pub = rospy.Publisher('/fg40_cmd', FG40MagnetCmd, queue_size=10)
@@ -764,6 +832,7 @@ class OffboardControl:
             "DISARM",
             "TAKEOFF",
             "LOITER",
+            "TASK",
             "SEARCH",
             {
                 'name': 'SCAN',
@@ -825,8 +894,17 @@ class OffboardControl:
             "trs_next", "TAKEOFF", "LOITER", conditions=["setpoint_check_smooth"]
         )
 
+        #Conditions for this need to be changed. Mission must be done before going into search
         self.machine.add_transition(
-            "trs_next", "LOITER", "SEARCH", conditions=["setpoint_check_smooth"]
+            "trs_next", "LOITER", "SEARCH", conditions=["spot_reqland_check", "setpoint_check_smooth"]
+        )
+        #Get SPs from Spot and do your task...
+        self.machine.add_transition(
+            "trs_next", "LOITER", "TASK", conditions=["start_mission_check", "setpoint_check_smooth"]
+        )
+        #When mission is done. LOITER...
+        self.machine.add_transition(
+            "trs_next", "TASK", "LOITER", conditions=["prog_mission_check", "done_mission_check", "setpoint_check_smooth"]
         )
         self.machine.add_transition(
             "trs_next",
@@ -912,6 +990,7 @@ class OffboardControl:
                 "FAILSAFE",
                 "TAKEOFF",
                 "LOITER",
+                "TASK",
                 "SEARCH",
                 "SCAN",
                 "APPROACH",
@@ -936,8 +1015,10 @@ class OffboardControl:
         OffboardControl.current_pose = msg.pose
 
         if not self.homeSetPos:
-            OffboardControl.home_pose = msg.pose
-            self.homeSetPos = True
+            if OffboardControl.current_state.armed:
+                OffboardControl.home_pose = msg.pose
+                self.homeSetPos = True
+                rospy.loginfo(f"Home position captured: x={msg.pose.position.x:.3f}, y={msg.pose.position.y:.3f}")
 
     def localvel_callback(self, msg):
         OffboardControl.current_vel = msg.twist
@@ -976,10 +1057,74 @@ class OffboardControl:
     def spot_pos_callback(self, msg):
         OffboardControl.spot_pose = msg.pose
 
-
     def dock_pos_callback(self, msg):
         OffboardControl.dock_pose = msg.pose
 
+    def service_callback(self, req):
+        if req.stateRequest == "BREAKAWAY":
+            #Arm the drone
+            #Request Offboard mode
+            self.magnet_publisher("demag")
+            self.magnet_publisher("demag")
+            self.arm()
+
+            while OffboardControl.current_state.mode != State.MODE_PX4_OFFBOARD:
+                self.offboard_request()
+
+            #Check px4 state and inform user
+            # if OffboardControl.current_state.mode == State.MODE_PX4_OFFBOARD:
+            #     rospy.loginfo("OFFBOARD ACCEPTED...X500 IS AUTONOMOUS...CAUTION")
+            rospy.loginfo("OFFBOARD ACCEPTED...X500 IS AUTONOMOUS...CAUTION")
+
+            while self.droneState.state != "LOITER":
+                rospy.loginfo_throttle(2.0, "WAITING FOR X500 TO FINISH TAKEOFF PROCEDURE...")
+                #do someting. How do I make the above send once?
+            rospy.loginfo_throttle(2.0, "X500 HAS FINISHED TAKEOFF. WAITING FOR MISSION...")
+            #SEND CLIENT CONFIRMATION
+            return missionResponse(success=True)
+
+        elif req.stateRequest == "INSPECT":
+            if not req.setpoints.poses:
+                rospy.logwarn("TASK WAS REQUESTED BUT NO SETPOINTS PROVIDED!")
+                return missionResponse(success=False)
+
+            if self.droneState.state == "LOITER" and OffboardControl.current_state.mode == State.MODE_PX4_OFFBOARD and not OffboardControl.on_mission:
+                OffboardControl.mission_sps = req.setpoints
+                OffboardControl.on_mission = True
+                OffboardControl.start_mission = True
+                return missionResponse(success=True)
+            else:
+                rospy.logwarn("X500 IS ALREADY ON A MISSION!")
+                return missionResponse(success=False)
+        
+        elif req.stateRequest == "TOUCHDOWN":
+            # if self.droneState.state == "LOITER" and OffboardControl.current_state.mode == State.MODE_PX4_OFFBOARD:
+            #     OffboardControl.land_requested = True
+
+            while self.droneState.state != "DISARM":
+                if self.droneState.state == "LOITER" and OffboardControl.current_state.mode == State.MODE_PX4_OFFBOARD:
+                    OffboardControl.land_requested = True
+                
+                rospy.loginfo_throttle(2.0, "WAITING FOR X500 TO LAND...")
+
+            rospy.loginfo("Magnetizing FG40...")
+            self.magnet_publisher("mag")
+            self.magnet_publisher("mag")
+            self.disarm()
+            return missionResponse(success=True)
+        
+        else:
+            #request not recognized, send a fail state
+            rospy.loginfo("REQUEST ERROR!")
+            return missionResponse(success=False)
+
+    def arm(self):
+        self.call_vehicle_command(400, 1.0, 0.0)
+        rospy.loginfo("ARM COMMAND INVOKED")
+    
+    def offboard_request(self):
+        self.call_vehicle_command(176, 1.0, 6.0)
+        rospy.loginfo("SPOT HAS REQUESTED TAKEOFF")
 
     def disarm(self):
         self.call_vehicle_command(400, 0.0, 21196)
@@ -1051,11 +1196,16 @@ class OffboardControl:
             
             self.droneState.trs_next()
             
-            if self.droneState.state == "DISARM":
-                rospy.loginfo("Magnetizing FG40...")
-                self.magnet_publisher("mag")
-                self.magnet_publisher("mag")
-                self.disarm()
+            # if self.droneState.state == "DISARM":
+            #     rospy.loginfo("Magnetizing FG40...")
+            #     self.magnet_publisher("mag")
+            #     self.magnet_publisher("mag")
+            #     self.disarm()
+
+            # if self.droneState.state == "TASK":
+            #     #Mission setpoints are in OffboardControl.mission_sps
+            #     droneState.update_setpoint_smooth()
+            #     pass
 
             rate.sleep()
 

@@ -21,15 +21,24 @@
 		<arg name="respawn_mavros" value="$(arg respawn_mavros)" />
 	</include>
 
-  <include file="$(find x500_description)/launch/x500_bringup.launch">
-  </include>
+	<node name="spot_pose" pkg="doggo_walker" type="spot_bridge.py" output="screen" /> 
 
-  <include file="$(find realsense2_camera)/launch/rs_d455.launch">
-  </include>
+  	<include file="$(find doggo_walker)/launch/broadcasters.launch">
+  	</include>
 
-  <include file="$(find gscam)/launch/c920.launch">
-  </include> 
-  
+  	<include file="$(find aruco_ros)/launch/rpi_marker_publisher.launch">
+  	</include>
+
+  	<include file="$(find x500_description)/launch/x500_bringup.launch">
+  	</include>
+
+  	<include file="$(find realsense2_camera)/launch/rs_d455.launch">
+  	</include>
+
+  	<node name="serial_node"        pkg="rosserial_python"      type="serial_node.py">
+  	<param name="port"              type="string"               value="/dev/ttyACM0"/>
+  	<param name="baud"              type="int"                  value="115200"/>
+  	</node>
 
 </launch>
 

@@ -18,7 +18,7 @@ import copy
 class MissionConfig:
     """Centralized configuration for mission parameters"""
     # Flight parameters
-    FLIGHT_HEIGHT = 1.5
+    FLIGHT_HEIGHT = 0.8
     TAKEOFF_SPEED = 0.3
     APPROACH_SPEED = 0.3
     LANDING_SPEED = 0.2
@@ -751,7 +751,7 @@ class OffboardControl:
         self.set_mode_client = rospy.ServiceProxy('/mavros/set_mode', SetMode)
 
 
-        OffboardControl.spot_pose.position.x = 2.1
+        OffboardControl.spot_pose.position.x = 2.4
         OffboardControl.spot_pose.position.y = 0.0
         OffboardControl.spot_pose.position.z = 0.0
         OffboardControl.spot_pose.orientation = OffboardControl.home_pose.orientation
@@ -974,7 +974,8 @@ class OffboardControl:
         self.mag_status = msg
 
     def spot_pos_callback(self, msg):
-        OffboardControl.spot_pose = msg.pose
+        #OffboardControl.spot_pose = msg.pose
+        pass
 
 
     def dock_pos_callback(self, msg):
@@ -1050,7 +1051,12 @@ class OffboardControl:
                 rospy.loginfo(f"STATE: {self.droneState.state} | Trajectory: complete")
             
             self.droneState.trs_next()
-            
+
+            if self.droneState.state == "ARM":
+                rospy.loginfo("DEMAGGIN FG40...")
+                self.magnet_publisher("demag")
+                self.magnet_publisher("demag")
+
             if self.droneState.state == "DISARM":
                 rospy.loginfo("Magnetizing FG40...")
                 self.magnet_publisher("mag")

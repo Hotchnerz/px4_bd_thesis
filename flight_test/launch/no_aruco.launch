@@ -21,12 +21,16 @@
 		<arg name="respawn_mavros" value="$(arg respawn_mavros)" />
 	</include>
 
+  	<node name="serial_node"        pkg="rosserial_python"      type="serial_node.py">
+  	<param name="port"              type="string"               value="/dev/ttyACM0"/>
+  	<param name="baud"              type="int"                  value="115200"/>
+  	</node>
+
 	<node name="spot_pose" pkg="doggo_walker" type="spot_bridge.py" output="screen" /> 
 
-  	<include file="$(find doggo_walker)/launch/broadcasters.launch">
-  	</include>
+	<node name="fid_off_pose" pkg="doggo_walker" type="fid_search_off.py" output="screen" />
 
-  	<include file="$(find aruco_ros)/launch/rpi_marker_publisher.launch">
+  	<include file="$(find doggo_walker)/launch/broadcasters.launch">
   	</include>
 
   	<include file="$(find x500_description)/launch/x500_bringup.launch">
@@ -35,13 +39,11 @@
   	<include file="$(find realsense2_camera)/launch/rs_d455.launch">
   	</include>
 
-  	<include file="$(find gscam)/launch/rpi_cam.launch">
+  	<include file="$(find gscam)/launch/c920.launch">
   	</include>
 
-  	<node name="serial_node"        pkg="rosserial_python"      type="serial_node.py">
-  	<param name="port"              type="string"               value="/dev/ttyACM0"/>
-  	<param name="baud"              type="int"                  value="115200"/>
-  	</node>
+	<node name="epm_state_reset_pub" pkg="rostopic" type="rostopic"
+		args="pub -1 /fg40_cmd fg40_msgs/FG40MagnetCmd 'cmd_magnet: 2'" />
 
 </launch>
 

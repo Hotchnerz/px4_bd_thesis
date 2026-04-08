@@ -1,0 +1,4 @@
+string stateRequest
+geometry_msgs/PoseArray setpoints
+---
+bool success

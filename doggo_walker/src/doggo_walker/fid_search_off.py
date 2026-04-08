@@ -4,17 +4,17 @@ import tf2_ros
 from geometry_msgs.msg import PoseStamped
 
 if __name__ == '__main__':
-    rospy.init_node('tf2_dock_listener')
+    rospy.init_node('tf2_fo_listener')
 
     tfBuffer = tf2_ros.Buffer()
     listener = tf2_ros.TransformListener(tfBuffer)
     
-    dock_pose = rospy.Publisher('/dock_pose', PoseStamped, queue_size=1)
+    fid_off_pose = rospy.Publisher('/fid_off_pose', PoseStamped, queue_size=1)
 
     rate = rospy.Rate(10.0)
     while not rospy.is_shutdown():
         try:
-            trans = tfBuffer.lookup_transform('map', 'dock', rospy.Time())
+            trans = tfBuffer.lookup_transform('map', 'fid_off', rospy.Time())
         except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
             rate.sleep()
             continue
@@ -31,6 +31,6 @@ if __name__ == '__main__':
         msg.pose.orientation.z = trans.transform.rotation.z
         msg.pose.orientation.w = trans.transform.rotation.w
 
-        dock_pose.publish(msg)
+        fid_off_pose.publish(msg)
 
         rate.sleep()
