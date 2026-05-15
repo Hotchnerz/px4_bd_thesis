@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import time
+from tqdm import tqdm
 
 import bosdyn.client
 import bosdyn.client.util
@@ -51,7 +52,7 @@ class SpotBodyPublisher:
         self._payload_registration_client = None
         self._graph_nav_client = None
 
-        self._upload_filepath = "/home/marslab/catkin_ws/src/doggo_walker/autowalks/x500_finalz.walk"
+        self._upload_filepath = "/home/radam/distrobox/bd_home/thesis_ws/src/doggo_walker/autowalks/x500_finalz.walk"
 
         # Store the most recent knowledge of the state of the robot based on rpc calls.
         self._current_graph = None
@@ -69,8 +70,8 @@ class SpotBodyPublisher:
         self.nominal_pose = None
 
         #Get and store payload creds
-        self.deployed_guid, self.deployed_secret = bosdyn.client.util.read_payload_credentials("/home/marslab/catkin_ws/src/doggo_walker/payload_creds/x500_undocked")
-        self.docked_guid, self.docked_secret = bosdyn.client.util.read_payload_credentials("/home/marslab/catkin_ws/src/doggo_walker/payload_creds/x500_docked")
+        self.deployed_guid, self.deployed_secret = bosdyn.client.util.read_payload_credentials("/home/radam/distrobox/bd_home/thesis_ws/src/doggo_walker/payload_creds/x500_undocked")
+        self.docked_guid, self.docked_secret = bosdyn.client.util.read_payload_credentials("/home/radam/distrobox/bd_home/thesis_ws/src/doggo_walker/payload_creds/x500_docked")
 
         #Ensure ROS Clients
         rospy.wait_for_service('/mission_service')
@@ -267,6 +268,8 @@ class SpotBodyPublisher:
 
         rospy.loginfo("Intializing VIO estimate...")
         self.zupvt_init()
+        #for _ in tqdm(range(150), desc="sleeping...", unit="s"):
+            #time.sleep(1)
         time.sleep(2.0)
 
         takeoff_request = missionRequest()

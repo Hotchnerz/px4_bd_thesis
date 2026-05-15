@@ -5,7 +5,7 @@ from geometry_msgs.msg import PoseStamped, PoseWithCovariance, Pose, TwistStampe
 from mavros_msgs.msg import State, ExtendedState, AttitudeTarget
 # from tf.transformations import euler_from_quaternion #Cannot use due to melodic pkgs being built with python2
 import tf2_ros
-from flight_test.transform_utils import euler_from_quaternion, pose_to_matrix, matrix_to_pose
+from flight_test.transform_utils import euler_from_quaternion, pose_to_matrix, matrix_to_pose, get_transform, transform_to_pose
 from mavros_msgs.srv import CommandBool, CommandBoolRequest, SetMode, SetModeRequest, CommandLong, CommandLongRequest
 from fg40_msgs.msg import FG40Feedback, FG40MagnetCmd
 from aruco_msgs.msg import MarkerArray, Marker
@@ -218,24 +218,24 @@ class DroneState:
         self.tf_listener = tf2_ros.TransformListener(self.tf_buffer)
 
 
-    def get_transform(self, target_frame, source_frame):
-        try:
-            trans = self.tf_buffer.lookup_transform(target_frame, source_frame, rospy.Time(0), rospy.Duration(0.1))
-            return trans
-        except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
-            rospy.logwarn(f"TF lookup failed ({target_frame} -> {source_frame}): {e}")
-            return None
+    # def get_transform(self, target_frame, source_frame):
+    #     try:
+    #         trans = self.tf_buffer.lookup_transform(target_frame, source_frame, rospy.Time(0), rospy.Duration(0.1))
+    #         return trans
+    #     except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
+    #         rospy.logwarn(f"TF lookup failed ({target_frame} -> {source_frame}): {e}")
+    #         return None
 
-    def transform_to_pose(self, trans):
-        pose = Pose()
-        pose.position.x = trans.transform.translation.x
-        pose.position.y = trans.transform.translation.y
-        pose.position.z = trans.transform.translation.z
-        pose.orientation.x = trans.transform.rotation.x
-        pose.orientation.y = trans.transform.rotation.y
-        pose.orientation.z = trans.transform.rotation.z
-        pose.orientation.w = trans.transform.rotation.w
-        return pose
+    # def transform_to_pose(self, trans):
+    #     pose = Pose()
+    #     pose.position.x = trans.transform.translation.x
+    #     pose.position.y = trans.transform.translation.y
+    #     pose.position.z = trans.transform.translation.z
+    #     pose.orientation.x = trans.transform.rotation.x
+    #     pose.orientation.y = trans.transform.rotation.y
+    #     pose.orientation.z = trans.transform.rotation.z
+    #     pose.orientation.w = trans.transform.rotation.w
+    #     return pose
 
     def test(self):
         return False
@@ -286,6 +286,11 @@ class DroneState:
         self.smooth_trajectory.cancel_trajectory()
 
     def on_enter_ARM(self, *args):
+        #Record home position
+        OffboardControl.home_pose = copy.deepcopy(OffboardControl.current_pose)
+        rospy.loginfo(f"Home Recorded: ({OffboardControl.home_pose.position.x:.3f}, "
+                        f"{OffboardControl.home_pose.position.y:.3f}, "
+                        f"{OffboardControl.home_pose.position.z:.3f})")
         # Start pub thread if not already running
         if not self.thread_start:
             # Reset stop event flag
@@ -298,7 +303,7 @@ class DroneState:
             self.thread_start = True
 
     def on_exit_IDLE(self, *args):
-        rospy.loginfo(f"Home Position Recorded: {OffboardControl.home_pose}")
+        pass
 
     def on_exit_LOITER(self, *args):
         msg = Pose()
@@ -394,14 +399,15 @@ class DroneState:
         return found_marker and is_first_msg
 
     def distance_check(self):
-        transform = self.get_transform('map', 'c920_link')
-        camera_pose = self.transform_to_pose(transform)
+        # transform = self.get_transform('map', 'c920_link')
+        # camera_pose = self.transform_to_pose(transform)
 
-        map_tform_camera = pose_to_matrix(camera_pose)
-        camera_tform_fiducial = pose_to_matrix(self.fiducial_pose)
+        # map_tform_camera = pose_to_matrix(camera_pose)
+        # camera_tform_fiducial = pose_to_matrix(self.fiducial_pose)
 
-        map_T_fiducial = map_tform_camera @ camera_tform_fiducial
-        fiducial_in_map = matrix_to_pose(map_T_fiducial)
+        # map_T_fiducial = map_tform_camera @ camera_tform_fiducial
+        # fiducial_in_map = matrix_to_pose(map_T_fiducial)
+        fiducial_in_map = self.fiducial_pose
 
         distance = np.sqrt(
             np.square(
@@ -521,6 +527,7 @@ class DroneState:
 
         # Use only the last 'window' poses
         recent = marker_copy[-window:]
+        rospy.loginfo(f"MARKER ARR: {recent}")
 
         # Average position
         avg_x = np.mean([p.position.x for p in recent])
@@ -552,6 +559,9 @@ class DroneState:
         averaged_pose.orientation.z = avg_q[2]
         averaged_pose.orientation.w = avg_q[3]
 
+        rospy.loginfo("Position: x=%.3f, y=%.3f, z=%.3f", averaged_pose.position.x, averaged_pose.position.y, averaged_pose.position.z)
+
+        rospy.loginfo("Orientation: x=%.3f, y=%.3f, z=%.3f, w=%.3f", averaged_pose.orientation.x, averaged_pose.orientation.y, averaged_pose.orientation.z, averaged_pose.orientation.w)
 
         return averaged_pose
 
@@ -578,14 +588,15 @@ class DroneState:
 
     def set_approach_setpoint_smooth(self):
         """approach setpoint"""
-        transform = self.get_transform('map', 'c920_link')
-        camera_pose = self.transform_to_pose(transform)
+        # transform = self.get_transform('map', 'c920_link')
+        # camera_pose = self.transform_to_pose(transform)
 
-        map_tform_camera = pose_to_matrix(camera_pose)
-        camera_tform_fiducial = pose_to_matrix(self.fiducial_pose)
+        # map_tform_camera = pose_to_matrix(camera_pose)
+        # camera_tform_fiducial = pose_to_matrix(self.fiducial_pose)
 
-        map_T_fiducial = map_tform_camera @ camera_tform_fiducial
-        fiducial_in_map = matrix_to_pose(map_T_fiducial)
+        # map_T_fiducial = map_tform_camera @ camera_tform_fiducial
+        # fiducial_in_map = matrix_to_pose(map_T_fiducial)
+        fiducial_in_map = self.fiducial_pose
 
         if not self.offapp_flag:
             self.x_app = fiducial_in_map.position.x
@@ -607,19 +618,24 @@ class DroneState:
         """final approach setpoint"""
 
         #Use the average fiduical pose and move to the dock_pose
-        transform_dock_pose = self.get_transform('id_121', 'dock')
-        dock_pose = self.transform_to_pose(transform_dock_pose)
+        # transform_dock_pose = self.get_transform('id_121', 'dock')
+        transform_dock_pose = get_transform(self.tf_buffer, 'id_121', 'dock')
+        if transform_dock_pose is None:
+            return  # or some other failure handling
+        dock_pose = transform_to_pose(transform_dock_pose)
 
-        transform_camera_pose = self.get_transform('map', 'c920_link')
-        camera_pose = self.transform_to_pose(transform_camera_pose)
+        # transform_camera_pose = self.get_transform('map', 'c920_link')
+        # camera_pose = self.transform_to_pose(transform_camera_pose)
 
         fiducial_tform_dock = pose_to_matrix(dock_pose)
-        camera_tform_fiducial = pose_to_matrix(self.fiducial_pose)
-        map_tform_camera = pose_to_matrix(camera_pose)
+        # camera_tform_fiducial = pose_to_matrix(self.fiducial_pose)
+        # map_tform_camera = pose_to_matrix(camera_pose)
+        map_tform_fiducial = pose_to_matrix(self.fiducial_pose)
 
-        camera_tform_dock = camera_tform_fiducial @ fiducial_tform_dock
-        map_tform_dock = map_tform_camera @ camera_tform_dock
+        # camera_tform_dock = camera_tform_fiducial @ fiducial_tform_dock
+        # map_tform_dock = map_tform_camera @ camera_tform_dock
 
+        map_tform_dock = map_tform_fiducial @ fiducial_tform_dock
         dock_in_map = matrix_to_pose(map_tform_dock)
 
         # if not self.offapp_flag:
@@ -721,41 +737,8 @@ class OffboardControl:
         OffboardControl.pub_thread = threading.Thread(target=self.trajectory_setpoint_publisher)
         OffboardControl.pub_thread.daemon = True
 
-        # Publishers
-        self.magnet_cmd_pub = rospy.Publisher('/fg40_cmd', FG40MagnetCmd, queue_size=10)
-        #Replaces TrajectorySetpoint
-        self.setpoint_publisher = rospy.Publisher('/mavros/setpoint_position/local', PoseStamped, queue_size=10)
-
-        # Subscribers
-        self.fg40_status_sub = rospy.Subscriber("/fg40_status", FG40Feedback, self.fg40_status_callback)
-        # Replaces VehicleLocalPosition and VehicleAttitude for Pose
-        self.localpos_subscriber = rospy.Subscriber("/mavros/local_position/pose", PoseStamped, self.localpos_callback)
-        self.localvel_subscriber = rospy.Subscriber("/mavros/local_position/velocity_local", TwistStamped, self.localvel_callback)
-        #Replacess VehicleStaus
-        self.drone_status_sub = rospy.Subscriber("/mavros/state", State, self.vehicle_status_callback)
-
-        #Replacess VehicleLandDetected but is missing the land detector checks built into uORB message.
-        self.drone_status_sub = rospy.Subscriber("/mavros/extended_state", ExtendedState, self.vehicle_land_det_callback)
-        
-        #Replaces ArucoMarkers
-        self.aruco_subscriber = rospy.Subscriber("/aruco_marker_publisher/markers", MarkerArray, self.aruco_callback)
-
-        self.thrust_subscriber = rospy.Subscriber("/mavros/setpoint_raw/target_attitude", AttitudeTarget, self.thrust_callback)
-        self.spot_pos_subscriber = rospy.Subscriber("/fid_off_pose", PoseStamped, self.spot_pos_callback)
-        self.dock_pos_subscriber = rospy.Subscriber("/dock_pose", PoseStamped, self.dock_pos_callback)
-
-        # Clients
-        rospy.wait_for_service('/mavros/cmd/command')
-        rospy.wait_for_service('/mavros/set_mode')
-        self.command_client = rospy.ServiceProxy('/mavros/cmd/command', CommandLong)
-        self.set_mode_client = rospy.ServiceProxy('/mavros/set_mode', SetMode)
-
-
-        OffboardControl.spot_pose.position.x = 2.1
-        OffboardControl.spot_pose.position.y = 0.0
-        OffboardControl.spot_pose.position.z = 0.0
-        OffboardControl.spot_pose.orientation = OffboardControl.home_pose.orientation
-
+        self.droneState = DroneState()
+        self.droneState.controller = self
 
         self.states = [
             "IDLE",
@@ -782,11 +765,45 @@ class OffboardControl:
             "MAN_OVERRIDE",
         ]
 
-        self.droneState = DroneState()
-        self.droneState.controller = self
         self.machine = TimeoutMachine(
             model=self.droneState, states=self.states, initial="IDLE"
         )
+
+        # Publishers
+        self.magnet_cmd_pub = rospy.Publisher('/fg40_cmd', FG40MagnetCmd, queue_size=10)
+        #Replaces TrajectorySetpoint
+        self.setpoint_publisher = rospy.Publisher('/mavros/setpoint_position/local', PoseStamped, queue_size=10)
+
+        # Subscribers
+        self.fg40_status_sub = rospy.Subscriber("/fg40_status", FG40Feedback, self.fg40_status_callback)
+        # Replaces VehicleLocalPosition and VehicleAttitude for Pose
+        self.localpos_subscriber = rospy.Subscriber("/mavros/local_position/pose", PoseStamped, self.localpos_callback)
+        self.localvel_subscriber = rospy.Subscriber("/mavros/local_position/velocity_local", TwistStamped, self.localvel_callback)
+        #Replacess VehicleStaus
+        self.drone_status_sub = rospy.Subscriber("/mavros/state", State, self.vehicle_status_callback)
+
+        #Replacess VehicleLandDetected but is missing the land detector checks built into uORB message.
+        self.extended_state_sub = rospy.Subscriber("/mavros/extended_state", ExtendedState, self.vehicle_land_det_callback)
+        
+        #Replaces ArucoMarkers
+        self.aruco_subscriber = rospy.Subscriber("/aruco_marker_publisher/markers", MarkerArray, self.aruco_callback)
+
+        self.thrust_subscriber = rospy.Subscriber("/mavros/setpoint_raw/target_attitude", AttitudeTarget, self.thrust_callback)
+        self.spot_pos_subscriber = rospy.Subscriber("/fid_off_pose", PoseStamped, self.spot_pos_callback)
+        self.dock_pos_subscriber = rospy.Subscriber("/dock_pose", PoseStamped, self.dock_pos_callback)
+
+        # Clients
+        rospy.wait_for_service('/mavros/cmd/command')
+        rospy.wait_for_service('/mavros/set_mode')
+        self.command_client = rospy.ServiceProxy('/mavros/cmd/command', CommandLong)
+        self.set_mode_client = rospy.ServiceProxy('/mavros/set_mode', SetMode)
+
+
+        OffboardControl.spot_pose.position.x = 1.5
+        OffboardControl.spot_pose.position.y = 0.0
+        OffboardControl.spot_pose.position.z = 0.0
+        OffboardControl.spot_pose.orientation.w = 1.0
+
 
         self.machine.add_transition(
             "trs_next",
@@ -935,10 +952,6 @@ class OffboardControl:
     def localpos_callback(self, msg):
         OffboardControl.current_pose = msg.pose
 
-        if not self.homeSetPos:
-            OffboardControl.home_pose = msg.pose
-            self.homeSetPos = True
-
     def localvel_callback(self, msg):
         OffboardControl.current_vel = msg.twist
 
@@ -953,17 +966,35 @@ class OffboardControl:
         found_121 = False
         for marker in msg.markers:
             if marker.id == 121 and marker.confidence > 0.8 and self.droneState.state == "SCAN":
-                found_121 = True
-                marker_poses = marker.pose.pose
+                #marker_poses = marker.pose.pose
+                # Compose to map frame outside of the lock, cannot be blocking.
+                tf = get_transform(
+                    self.droneState.tf_buffer,
+                    'map',
+                    marker.header.frame_id,
+                    stamp=marker.header.stamp,
+                    timeout=0.05,
+                )
+                if tf is None:
+                    # Drop the sample
+                    rospy.logwarn_throttle(1.0, "ArUco TF compose failed; sample dropped")
+                    break
+
+                map_T_cam = pose_to_matrix(transform_to_pose(tf))
+                cam_T_fid = pose_to_matrix(marker.pose.pose)
+                map_T_fid_pose = matrix_to_pose(map_T_cam @ cam_T_fid)
 
                 with OffboardControl.offboard_lock:
+                    if self.droneState.state != "SCAN":
+                        break
                     if not OffboardControl.first_aruco_msg:
                         OffboardControl.first_aruco_msg = True
                     if len(OffboardControl.marker_window) < MissionConfig.MOVING_AVG_WINDOW:
-                        OffboardControl.marker_window.append(marker_poses)
+                        OffboardControl.marker_window.append(map_T_fid_pose)
                     else:
                         OffboardControl.marker_window.pop(0)
-                        OffboardControl.marker_window.append(marker_poses)
+                        OffboardControl.marker_window.append(map_T_fid_pose)
+                    found_121 = True
                 break
 
         with OffboardControl.offboard_lock:
